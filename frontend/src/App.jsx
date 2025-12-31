@@ -38,7 +38,7 @@ const AdsorptionDashboard = () => {
   const handleCalculate = async () => {
     setIsProcessing(true);
     try {
-      const response = await axios.post('http://127.0.0.1:8000/calculate', {
+      const response = await axios.post('https://adsorption-backend.onrender.com/calculate', {
         temperature: config.temperature, 
         gasType: config.gasType, 
         model: config.model,
