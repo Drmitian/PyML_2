@@ -21,7 +21,7 @@ const AdsorptionDashboard = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   
-  // Ref is now used specifically for the Chart container
+  // Ref for capturing the chart image
   const chartRef = useRef(null);
 
   // --- Handlers ---
@@ -44,6 +44,7 @@ const AdsorptionDashboard = () => {
   const handleCalculate = async () => {
     setIsProcessing(true);
     try {
+      // NOTE: Update this URL if you moved to Vercel Backend
       const response = await axios.post('https://adsorption-backend.onrender.com/calculate', {
         temperature: config.temperature,
         gasType: config.gasType,
@@ -81,7 +82,6 @@ const AdsorptionDashboard = () => {
 
   const handleDownloadImage = async () => {
     if (chartRef.current) {
-      // Added padding to the screenshot so the labels aren't cut off
       const canvas = await html2canvas(chartRef.current, { backgroundColor: '#ffffff', scale: 2 });
       const link = document.createElement('a');
       link.download = `isotherm_chart_${config.gasType}.png`;
@@ -181,7 +181,6 @@ const AdsorptionDashboard = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           {/* 1. CHART + DIAGRAM ROW */}
-          {/* We removed ref={chartRef} from here so it doesn't capture the whole white box */}
           <div style={{ ...cardStyle, height: 'auto', padding: '20px' }}>
             
             {/* Split View: Chart vs Diagram */}
@@ -192,8 +191,7 @@ const AdsorptionDashboard = () => {
               alignItems: 'start' 
             }}>
               
-              {/* --- CAPTURE TARGET --- */}
-              {/* We put ref={chartRef} here. This means only this Title + Chart is downloaded. */}
+              {/* --- CAPTURE TARGET (Title + Chart) --- */}
               <div style={{ width: '100%', padding: '10px', backgroundColor: 'white' }} ref={chartRef}>
                 <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>Adsorption Isotherms</h2>
                 <div style={{ height: '550px', width: '100%' }}>
@@ -205,21 +203,29 @@ const AdsorptionDashboard = () => {
                         <YAxis label={{ value: 'Uptake (wt%)', angle: -90, position: 'insideLeft' }} />
                         <Tooltip contentStyle={{ border: '1px solid #ccc' }} />
                         
+                        {/* LEGEND ORDER FIXED: Exp -> Excess -> Absolute -> Total */}
                         <Legend 
                           verticalAlign="top" 
                           height={36}
                           wrapperStyle={{ fontSize: '12px' }}
                           payload={[
-                            { value: 'Experimental', type: 'circle', id: 'exp', color: '#000000', fill: '#000000' }, 
+                            { value: 'Experimental Data', type: 'circle', id: 'exp', color: '#000000', fill: '#000000' }, 
                             { value: 'Excess (Fit)', type: 'plain', id: 'exc', color: '#dc2626' },
                             { value: 'Absolute (Calc)', type: 'plain', id: 'abs', color: '#2563eb', payload: { strokeDasharray: '5 5' } },
                             { value: 'Total Capacity', type: 'plain', id: 'tot', color: '#16a34a' }
                           ]}
                         />
 
+                        {/* DRAWING ORDER (Bottom to Top):
+                            1. Total (Green) - Bottom
+                            2. Absolute (Blue Dashed) - Middle
+                            3. Excess (Red) - Top
+                            4. Experimental (Dots) - Very Top
+                        */}
+                        <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={2} name="Total Capacity" dot={false} />
                         <Line type="monotone" dataKey="absolute" stroke="#2563eb" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
                         <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
-                        <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={2} name="Total Capacity" dot={false} />
+                        
                         <Line 
                           type="monotone" 
                           dataKey="excessRaw" 
@@ -239,8 +245,8 @@ const AdsorptionDashboard = () => {
                 </div>
               </div>
 
-              {/* Diagram - OUTSIDE the Capture Ref */}
-              <div style={{ width: '100%', height: '580px' }}> {/* Adjusted height to match title+chart */}
+              {/* Diagram */}
+              <div style={{ width: '100%', height: '580px' }}>
                  <ConceptDiagram />
               </div>
             </div>
