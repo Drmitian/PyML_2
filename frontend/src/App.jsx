@@ -9,7 +9,6 @@ import IsothermInfoModal from './IsothermInfo';
 import ConceptDiagram from './ConceptDiagram';
 
 const AdsorptionDashboard = () => {
-  // --- State Management ---
   const [inputData, setInputData] = useState([]);
   const [config, setConfig] = useState({
     gasType: 'Hydrogen',
@@ -21,10 +20,7 @@ const AdsorptionDashboard = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   
-  // Ref for capturing the chart image
   const chartRef = useRef(null);
-
-  // --- Handlers ---
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -44,7 +40,6 @@ const AdsorptionDashboard = () => {
   const handleCalculate = async () => {
     setIsProcessing(true);
     try {
-      // NOTE: Update this URL if you moved to Vercel Backend
       const response = await axios.post('https://adsorption-backend.onrender.com/calculate', {
         temperature: config.temperature,
         gasType: config.gasType,
@@ -90,7 +85,6 @@ const AdsorptionDashboard = () => {
     }
   };
 
-  // --- Styles ---
   const containerStyle = { padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1600px', margin: '0 auto' };
   const cardStyle = { border: '1px solid #ddd', borderRadius: '8px', padding: '20px', marginBottom: '20px', backgroundColor: 'white' };
   const buttonStyle = { width: '100%', padding: '10px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
@@ -101,34 +95,21 @@ const AdsorptionDashboard = () => {
     <div style={containerStyle}>
       <IsothermInfoModal isOpen={showInfo} onClose={() => setShowInfo(false)} />
 
-      {/* Header */}
       <header style={{ borderBottom: '1px solid #eee', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Total Gas Adsorption Evaluator</h1>
-        <button 
-          onClick={() => setShowInfo(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: '1px solid #ccc', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
-        >
+        <button onClick={() => setShowInfo(true)} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: '1px solid #ccc', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>
           <Info size={18} /> Help & Definitions
         </button>
       </header>
 
-      {/* MAIN GRID: Left (Controls) vs Right (Results) */}
       <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '20px' }}>
-        
-        {/* --- LEFT COLUMN: Controls --- */}
         <div>
-          {/* Data Input Section */}
           <div style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
                 <Upload size={20} style={{ marginRight: '10px' }} /> Data Input
               </h2>
-              <button 
-                onClick={handleDownloadTemplate} 
-                style={{ fontSize: '12px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-              >
-                Template
-              </button>
+              <button onClick={handleDownloadTemplate} style={{ fontSize: '12px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Template</button>
             </div>
             <div style={{ border: '2px dashed #ccc', padding: '20px', textAlign: 'center', cursor: 'pointer' }}>
               <input type="file" onChange={handleFileUpload} accept=".csv,.txt" />
@@ -137,7 +118,6 @@ const AdsorptionDashboard = () => {
             {inputData.length > 0 && <div style={{ marginTop: '10px', color: 'green', fontWeight: 'bold' }}>✓ Loaded {inputData.length} points</div>}
           </div>
 
-          {/* Parameters Section */}
           <div style={cardStyle}>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>
               <Settings size={20} style={{ marginRight: '10px', verticalAlign: 'middle' }} /> Parameters
@@ -161,7 +141,6 @@ const AdsorptionDashboard = () => {
             </button>
           </div>
 
-          {/* Download Controls */}
           {results && (
             <div style={cardStyle}>
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>
@@ -177,21 +156,10 @@ const AdsorptionDashboard = () => {
           )}
         </div>
 
-        {/* --- RIGHT COLUMN: Results Wrapper --- */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
-          {/* 1. CHART + DIAGRAM ROW */}
           <div style={{ ...cardStyle, height: 'auto', padding: '20px' }}>
-            
-            {/* Split View: Chart vs Diagram */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'minmax(450px, 3fr) minmax(250px, 1fr)', 
-              gap: '20px',
-              alignItems: 'start' 
-            }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(450px, 3fr) minmax(250px, 1fr)', gap: '20px', alignItems: 'start' }}>
               
-              {/* --- CAPTURE TARGET (Title + Chart) --- */}
               <div style={{ width: '100%', padding: '10px', backgroundColor: 'white' }} ref={chartRef}>
                 <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>Adsorption Isotherms</h2>
                 <div style={{ height: '550px', width: '100%' }}>
@@ -203,7 +171,6 @@ const AdsorptionDashboard = () => {
                         <YAxis label={{ value: 'Uptake (wt%)', angle: -90, position: 'insideLeft' }} />
                         <Tooltip contentStyle={{ border: '1px solid #ccc' }} />
                         
-                        {/* LEGEND ORDER FIXED: Exp -> Excess -> Absolute -> Total */}
                         <Legend 
                           verticalAlign="top" 
                           height={36}
@@ -216,15 +183,37 @@ const AdsorptionDashboard = () => {
                           ]}
                         />
 
-                        {/* DRAWING ORDER (Bottom to Top):
-                            1. Total (Green) - Bottom
-                            2. Absolute (Blue Dashed) - Middle
-                            3. Excess (Red) - Top
-                            4. Experimental (Dots) - Very Top
-                        */}
-                        <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={2} name="Total Capacity" dot={false} />
-                        <Line type="monotone" dataKey="absolute" stroke="#2563eb" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
-                        <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
+                        {/* 1. Total (Green Glow) - Bottom Layer, Thick & Transparent */}
+                        <Line 
+                          type="monotone" 
+                          dataKey="total" 
+                          stroke="#16a34a" 
+                          strokeWidth={6} 
+                          strokeOpacity={0.4} 
+                          name="Total Capacity" 
+                          dot={false} 
+                        />
+                        
+                        {/* 2. Absolute (Blue) - Middle Layer, Sharp & Dashed */}
+                        <Line 
+                          type="monotone" 
+                          dataKey="absolute" 
+                          stroke="#2563eb" 
+                          strokeWidth={2} 
+                          name="Absolute (Calc)" 
+                          dot={false} 
+                          strokeDasharray="5 5" 
+                        />
+                        
+                        {/* 3. Excess (Red) - Top Layer */}
+                        <Line 
+                          type="monotone" 
+                          dataKey="excessFit" 
+                          stroke="#dc2626" 
+                          strokeWidth={2} 
+                          name="Excess (Fit)" 
+                          dot={false} 
+                        />
                         
                         <Line 
                           type="monotone" 
@@ -245,14 +234,12 @@ const AdsorptionDashboard = () => {
                 </div>
               </div>
 
-              {/* Diagram */}
               <div style={{ width: '100%', height: '580px' }}>
                  <ConceptDiagram />
               </div>
             </div>
           </div>
 
-          {/* 2. FITTED PARAMETERS ROW */}
           {results && (
             <div style={cardStyle}>
               <h3 style={{ fontWeight: 'bold', marginBottom: '15px' }}>Fitted Parameters</h3>
