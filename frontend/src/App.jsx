@@ -196,13 +196,13 @@ const AdsorptionDashboard = () => {
             {/* Split View: Chart vs Diagram */}
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: 'minmax(450px, 3fr) minmax(250px, 1fr)', // Chart gets 3x space, Diagram gets 1x
+              gridTemplateColumns: 'minmax(450px, 3fr) minmax(250px, 1fr)', 
               gap: '20px',
               alignItems: 'start' 
             }}>
               
-              {/* Chart */}
-              <div style={{ height: '500px', width: '100%' }}>
+              {/* Chart - FIXED HEIGHT (Square-ish) */}
+              <div style={{ height: '550px', width: '100%' }}>
                 {results ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={results.chartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
@@ -244,14 +244,14 @@ const AdsorptionDashboard = () => {
                 )}
               </div>
 
-              {/* Diagram */}
-              <div style={{ width: '100%' }}>
+              {/* Diagram - SAME FIXED HEIGHT (Scrollable) */}
+              <div style={{ width: '100%', height: '550px' }}>
                  <ConceptDiagram />
               </div>
             </div>
           </div>
 
-          {/* 2. FITTED PARAMETERS ROW (Restored!) */}
+          {/* 2. FITTED PARAMETERS ROW */}
           {results && (
             <div style={cardStyle}>
               <h3 style={{ fontWeight: 'bold', marginBottom: '15px' }}>Fitted Parameters</h3>
