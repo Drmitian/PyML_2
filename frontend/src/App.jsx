@@ -320,10 +320,10 @@ const AdsorptionDashboard = () => {
       {/* FOOTER - OWNERSHIP & CREDITS */}
       <footer style={{ marginTop: '40px', textAlign: 'center', color: '#666', fontSize: '14px', borderTop: '1px solid #eee', padding: '20px' }}>
         <p>
-          <strong>Total Gas Adsorption Evaluator</strong> &copy; 2025 Created by <strong>Your Name / Lab Name</strong>
+          <strong>Total Gas Adsorption Evaluator</strong> &copy; 2025 Created by <strong>Mi Tian</strong>
         </p>
         <p style={{ fontSize: '12px', marginTop: '5px' }}>
-          Based on the algorithm by Sharpe et al. (2013), implemented by Your Name.
+          Based on the algorithm by Sharpe et al. (2013), implemented by Mi Tian.
           <br />
           <a href="https://github.com/Drmitian/PyML" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'none' }}>
             View Source Code
