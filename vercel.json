@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/calculate", "destination": "/backend/main.py" },
+    { "source": "/calculate", "destination": "/api/index.py" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
