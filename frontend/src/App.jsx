@@ -40,6 +40,8 @@ const AdsorptionDashboard = () => {
   const handleCalculate = async () => {
     setIsProcessing(true);
     try {
+      // ⚠️ IMPORTANT: If you moved to Vercel, ensure this URL is correct!
+      // Example: 'https://adsorption-backend-YOURPROJECT.vercel.app/calculate'
       const response = await axios.post('https://adsorption-backend.onrender.com/calculate', {
         temperature: config.temperature,
         gasType: config.gasType,
@@ -171,41 +173,42 @@ const AdsorptionDashboard = () => {
                         <YAxis label={{ value: 'Uptake (wt%)', angle: -90, position: 'insideLeft' }} />
                         <Tooltip contentStyle={{ border: '1px solid #ccc' }} />
                         
+                        {/* LEGEND ORDER: Exp, Excess, Absolute, Total */}
                         <Legend 
                           verticalAlign="top" 
                           height={36}
                           wrapperStyle={{ fontSize: '12px' }}
                           payload={[
                             { value: 'Experimental Data', type: 'circle', id: 'exp', color: '#000000', fill: '#000000' }, 
-                            { value: 'Excess (Fit)', type: 'plain', id: 'exc', color: '#dc2626' },
-                            { value: 'Absolute (Calc)', type: 'plain', id: 'abs', color: '#2563eb', payload: { strokeDasharray: '5 5' } },
-                            { value: 'Total Capacity', type: 'plain', id: 'tot', color: '#16a34a' }
+                            { value: 'Excess (Fit)', type: 'plain', id: 'exc', color: '#dc2626' }, // Red
+                            { value: 'Absolute (Calc)', type: 'plain', id: 'abs', color: '#9333ea', payload: { strokeDasharray: '5 5' } }, // Purple Dashed
+                            { value: 'Total Capacity', type: 'plain', id: 'tot', color: '#16a34a' } // Green
                           ]}
                         />
 
-                        {/* 1. Total (Green Glow) - Bottom Layer, Thick & Transparent */}
+                        {/* DRAWING ORDER (Bottom -> Top) */}
+                        {/* 1. Total (Green Solid) - Drawn first at bottom */}
                         <Line 
                           type="monotone" 
                           dataKey="total" 
                           stroke="#16a34a" 
-                          strokeWidth={6} 
-                          strokeOpacity={0.4} 
+                          strokeWidth={4} 
                           name="Total Capacity" 
                           dot={false} 
                         />
                         
-                        {/* 2. Absolute (Blue) - Middle Layer, Sharp & Dashed */}
+                        {/* 2. Absolute (Purple Dashed) - Drawn on top of Total */}
                         <Line 
                           type="monotone" 
                           dataKey="absolute" 
-                          stroke="#2563eb" 
+                          stroke="#9333ea" 
                           strokeWidth={2} 
                           name="Absolute (Calc)" 
                           dot={false} 
                           strokeDasharray="5 5" 
                         />
                         
-                        {/* 3. Excess (Red) - Top Layer */}
+                        {/* 3. Excess (Red Solid) - Clearly distinct */}
                         <Line 
                           type="monotone" 
                           dataKey="excessFit" 
@@ -215,6 +218,7 @@ const AdsorptionDashboard = () => {
                           dot={false} 
                         />
                         
+                        {/* 4. Experimental (Dots) - Topmost */}
                         <Line 
                           type="monotone" 
                           dataKey="excessRaw" 
