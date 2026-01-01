@@ -9,6 +9,7 @@ import IsothermInfoModal from './IsothermInfo';
 import ConceptDiagram from './ConceptDiagram';
 
 const AdsorptionDashboard = () => {
+  // --- State Management ---
   const [inputData, setInputData] = useState([]);
   const [config, setConfig] = useState({
     gasType: 'Hydrogen',
@@ -21,6 +22,8 @@ const AdsorptionDashboard = () => {
   const [showInfo, setShowInfo] = useState(false);
   
   const chartRef = useRef(null);
+
+  // --- Handlers ---
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -37,20 +40,47 @@ const AdsorptionDashboard = () => {
     reader.readAsText(file);
   };
 
+  // --- UPDATED CALCULATION HANDLER (Global Solver Support) ---
   const handleCalculate = async () => {
     setIsProcessing(true);
     try {
-      // ⚠️ IMPORTANT: If you moved to Vercel, ensure this URL is correct!
-      // Example: 'https://adsorption-backend-YOURPROJECT.vercel.app/calculate'
-      const response = await axios.post('https://adsorption-backend.onrender.com/calculate', {
-        temperature: config.temperature,
+      // ⚠️ IMPORTANT: Replace this URL with your actual Backend URL
+      // If using Vercel: 'https://adsorption-backend-YOURPROJECT.vercel.app/calculate'
+      // If using Render: 'https://adsorption-backend.onrender.com/calculate'
+      const backendUrl = 'https://adsorption-backend.onrender.com/calculate'; 
+
+      const response = await axios.post(backendUrl, {
         gasType: config.gasType,
         model: config.model,
-        data: inputData
+        // Wrap the single dataset in a list to satisfy the Global Solver
+        datasets: [
+            {
+                temperature: config.temperature,
+                data: inputData
+            }
+        ]
       });
-      setResults(response.data);
+      
+      // Handle the new response structure
+      // The backend returns a list of results, we just take the first one (since we only sent one)
+      const firstSet = response.data.datasets[0];
+      const globalParams = response.data.globalParameters;
+      const warnings = response.data.warnings || [];
+
+      // Display physics warnings if any (e.g., rhoA < rhoB)
+      if(warnings.length > 0) alert(warnings.join('\n'));
+
+      setResults({
+        chartData: firstSet.chartData,
+        parameters: {
+            ...globalParams,
+            b: firstSet.b
+        }
+      });
+
     } catch (error) {
-      alert("Error: Is backend running? Or model not supported?");
+      alert("Error: Calculation failed. Check if backend is running and URL is correct.");
+      console.error(error);
     }
     setIsProcessing(false);
   };
@@ -173,61 +203,29 @@ const AdsorptionDashboard = () => {
                         <YAxis label={{ value: 'Uptake (wt%)', angle: -90, position: 'insideLeft' }} />
                         <Tooltip contentStyle={{ border: '1px solid #ccc' }} />
                         
-                        {/* LEGEND ORDER: Exp, Excess, Absolute, Total */}
                         <Legend 
                           verticalAlign="top" 
                           height={36}
                           wrapperStyle={{ fontSize: '12px' }}
                           payload={[
                             { value: 'Experimental Data', type: 'circle', id: 'exp', color: '#000000', fill: '#000000' }, 
-                            { value: 'Excess (Fit)', type: 'plain', id: 'exc', color: '#dc2626' }, // Red
-                            { value: 'Absolute (Calc)', type: 'plain', id: 'abs', color: '#9333ea', payload: { strokeDasharray: '5 5' } }, // Purple Dashed
-                            { value: 'Total Capacity', type: 'plain', id: 'tot', color: '#16a34a' } // Green
+                            { value: 'Excess (Fit)', type: 'plain', id: 'exc', color: '#dc2626' }, 
+                            { value: 'Absolute (Calc)', type: 'plain', id: 'abs', color: '#9333ea', payload: { strokeDasharray: '5 5' } }, 
+                            { value: 'Total Capacity', type: 'plain', id: 'tot', color: '#16a34a' } 
                           ]}
                         />
 
-                        {/* DRAWING ORDER (Bottom -> Top) */}
-                        {/* 1. Total (Green Solid) - Drawn first at bottom */}
-                        <Line 
-                          type="monotone" 
-                          dataKey="total" 
-                          stroke="#16a34a" 
-                          strokeWidth={4} 
-                          name="Total Capacity" 
-                          dot={false} 
-                        />
+                        {/* 1. Total (Green Solid) - Bottom Layer */}
+                        <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={4} name="Total Capacity" dot={false} />
                         
-                        {/* 2. Absolute (Purple Dashed) - Drawn on top of Total */}
-                        <Line 
-                          type="monotone" 
-                          dataKey="absolute" 
-                          stroke="#9333ea" 
-                          strokeWidth={2} 
-                          name="Absolute (Calc)" 
-                          dot={false} 
-                          strokeDasharray="5 5" 
-                        />
+                        {/* 2. Absolute (Purple Dashed) - Middle Layer */}
+                        <Line type="monotone" dataKey="absolute" stroke="#9333ea" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
                         
-                        {/* 3. Excess (Red Solid) - Clearly distinct */}
-                        <Line 
-                          type="monotone" 
-                          dataKey="excessFit" 
-                          stroke="#dc2626" 
-                          strokeWidth={2} 
-                          name="Excess (Fit)" 
-                          dot={false} 
-                        />
+                        {/* 3. Excess (Red Solid) - Top Layer */}
+                        <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
                         
                         {/* 4. Experimental (Dots) - Topmost */}
-                        <Line 
-                          type="monotone" 
-                          dataKey="excessRaw" 
-                          stroke="none" 
-                          name="Experimental Data" 
-                          dot={{ r: 4, fill: '#000000', stroke: 'none' }} 
-                          activeDot={{ r: 6 }}
-                          isAnimationActive={false}
-                        /> 
+                        <Line type="monotone" dataKey="excessRaw" stroke="none" name="Experimental Data" dot={{ r: 4, fill: '#000000', stroke: 'none' }} activeDot={{ r: 6 }} isAnimationActive={false} /> 
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
