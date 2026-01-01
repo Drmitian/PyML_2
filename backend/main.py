@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import numpy as np
-from scipy.optimize import curve_fit
+from scipy.optimize import least_squares
 
+# --- 1. App Configuration ---
 app = FastAPI()
 
 app.add_middleware(
@@ -15,7 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Data Models ---
+# --- 2. Data Models ---
 class DataPoint(BaseModel):
     pressure: float
     excessUptake: float
@@ -26,149 +27,162 @@ class CalculateRequest(BaseModel):
     model: str
     data: List[DataPoint]
 
-# --- Physics Constants ---
-R_GAS = 8.314  # J/(mol·K)
+# --- 3. Physics Constants & Gas Properties ---
+R_GAS = 8.314462618  # J/(mol*K)
 
-# Gas Properties (Critical Temp/Pressure for Density Calculation)
+# Molar Masses (kg/mol) and Critical Props for Z-factor calc
 GAS_PROPS = {
-    "Hydrogen": {"M": 2.016, "Tc": 33.145, "Pc": 1.2964},
-    "Methane":  {"M": 16.04,  "Tc": 190.56, "Pc": 4.599},
-    "CO2":      {"M": 44.01,  "Tc": 304.13, "Pc": 7.377}
+    "Hydrogen": {"M_kg": 2.01588e-3, "Tc": 33.145, "Pc": 1.2964},
+    "Methane":  {"M_kg": 16.04e-3,   "Tc": 190.56, "Pc": 4.599},
+    "CO2":      {"M_kg": 44.01e-3,   "Tc": 304.13, "Pc": 7.377}
 }
 
-# --- Bulk Density Calculator (Redlich-Kwong EOS) ---
-# Returns rho_bulk in g/cm³
-def calculate_bulk_density(pressure_mpa, temp_k, gas_type):
-    P_bar = pressure_mpa * 10
-    props = GAS_PROPS.get(gas_type, GAS_PROPS["Hydrogen"])
-    
-    Tc = props["Tc"]
-    Pc = props["Pc"]
-    M = props["M"]
-
-    # Compressibility Factor (Z) Approximation
+# --- 4. Bulk Density Calculator (rho_B) ---
+# Implements Eq 10 from Sharpe et al. (2013)
+def get_compressibility_Z(P_MPa, T_K, gas_type):
+    """Calculates Z factor using simplified EOS for speed."""
+    P_bar = P_MPa * 10
     if gas_type == "Hydrogen":
-        Z = 1.0 + (0.0006 * P_bar)
+        return 1.0 + (0.0006 * P_bar)
     elif gas_type == "CO2":
         Z = 1.0 - (0.005 * P_bar) + (0.00002 * P_bar**2)
-        if Z < 0.3: Z = 0.3
+        return max(Z, 0.3)
     else: # Methane
         Z = 1.0 - (0.002 * P_bar)
-        if Z < 0.6: Z = 0.6
+        return max(Z, 0.6)
 
-    P_pa = pressure_mpa * 1e6
-    rho_g_m3 = (P_pa * M) / (Z * R_GAS * temp_k) 
-    rho_g_cm3 = rho_g_m3 / 1e6 
+def rho_bulk_g_cm3(P_MPa, T_K, gas_type):
+    """
+    Bulk density rho_B = (P * M) / (Z * R * T)
+    """
+    props = GAS_PROPS.get(gas_type, GAS_PROPS["Hydrogen"])
+    M_kg = props["M_kg"]
+    
+    # Vectorized Z calculation
+    if np.isscalar(P_MPa):
+        Z = get_compressibility_Z(P_MPa, T_K, gas_type)
+    else:
+        Z = np.array([get_compressibility_Z(p, T_K, gas_type) for p in P_MPa])
+
+    P_Pa = P_MPa * 1e6
+    rho_kg_m3 = (P_Pa * M_kg) / (Z * R_GAS * T_K)
+    rho_g_cm3 = rho_kg_m3 / 1000.0
     return rho_g_cm3
 
-# --- Isotherm Models (Theta: 0 to 1) ---
-# Using forms from Table 1 of Sharpe et al. 2013
-
-def theta_langmuir(P, b):
+# --- 5. Theta Models (H_A) ---
+def H_langmuir(P_MPa, b):
     # Eq 2: bP / (1 + bP)
-    return (b * P) / (1 + b * P)
+    x = b * P_MPa
+    return x / (1.0 + x)
 
-def theta_toth(P, b, t):
-    # Eq 13: bP / (1 + (bP)^t)^(1/t)
-    # Note: Using b as affinity parameter (inverse pressure)
-    return (b * P) / ((1 + (b * P)**t)**(1/t))
+def H_toth(P_MPa, b, c):
+    # Eq 13: bP / [1 + (bP)^c]^(1/c)
+    x = b * P_MPa
+    return x / (1.0 + np.power(x, c)) ** (1.0 / c)
 
-def theta_sips(P, b, n):
-    # Eq 16: (bP)^(1/n) / (1 + (bP)^(1/n))
-    return ((b * P)**(1/n)) / (1 + (b * P)**(1/n))
+def H_sips(P_MPa, b, n):
+    # Eq 16: (bP)^(1/n) / [1 + (bP)^(1/n)]
+    x = np.power(b * P_MPa, 1.0/n)
+    return x / (1.0 + x)
 
-# --- Fitting Function: Equation 12 (Sharpe 2013) ---
-# m_E = (rho_A - rho_B) * v_P * Theta * 100
-def excess_model_wrapper(P, rho_A, vp, b, c, gas_type, temp, model_name):
-    rho_B = np.array([calculate_bulk_density(p, temp, gas_type) for p in P])
-    
-    if model_name == 'langmuir':
-        theta = theta_langmuir(P, b)
-    elif model_name == 'sips':
-        theta = theta_sips(P, b, c)
-    else: # toth
-        theta = theta_toth(P, b, c)
-        
-    # Eq 12: Excess = (AdsorbateDensity - BulkDensity) * PoreVolume * FillingFraction * 100
-    return (rho_A - rho_B) * vp * theta * 100
+# --- 6. Core Physics Algorithms (Sharpe 2013) ---
 
+def m_excess_wt_percent(P_MPa, T_K, vP, rhoA, H_A, gas_type):
+    """
+    Excess Uptake (Eq 12): mE = (rhoA - rhoB) * 100 * vP * H_A
+    """
+    rhoB = rho_bulk_g_cm3(P_MPa, T_K, gas_type)
+    return (rhoA - rhoB) * 100.0 * vP * H_A
+
+def m_absolute_wt_percent(vP, rhoA, H_A):
+    """
+    Absolute Uptake: mA = rhoA * 100 * vP * H_A
+    Derived from Eq 5 & 11 (mA = rhoA * vA)
+    """
+    return rhoA * 100.0 * vP * H_A
+
+def m_total_wt_percent(P_MPa, T_K, vP, mE_wt, gas_type):
+    """
+    Total Uptake (Eq 9): mP = mE + rhoB * 100 * vP
+    """
+    rhoB = rho_bulk_g_cm3(P_MPa, T_K, gas_type)
+    return mE_wt + (rhoB * 100.0 * vP)
+
+
+# --- 7. Main API Endpoint ---
 @app.post("/calculate")
 async def calculate_isotherms(req: CalculateRequest):
     try:
-        # 1. Extract Data
-        pressures = np.array([d.pressure for d in req.data])
-        excess_raw = np.array([d.excessUptake for d in req.data])
+        # A. Prepare Data
+        P_exp = np.array([d.pressure for d in req.data], dtype=float)
+        mE_exp = np.array([d.excessUptake for d in req.data], dtype=float)
         
-        # 2. Fit Parameters [rho_A, vp, b, c]
-        # Initial guesses are critical for physically meaningful results
-        # rho_A guess: ~0.07 g/cm3 for H2, higher for others
-        rho_guess = 0.1
-        if req.gasType == "Methane": rho_guess = 0.3
-        if req.gasType == "CO2": rho_guess = 0.8
+        # B. Define Residuals Function
+        def residuals(x):
+            # Unpack parameters: vP, rhoA, b, c
+            vP, rhoA, b, c = x
+            
+            # Select Model
+            if req.model == 'langmuir':
+                H = H_langmuir(P_exp, b)
+            elif req.model == 'sips':
+                H = H_sips(P_exp, b, c) # c is 'n' here
+            else: # toth
+                H = H_toth(P_exp, b, c)
+            
+            # Calculate Excess Prediction
+            mE_pred = m_excess_wt_percent(P_exp, req.temperature, vP, rhoA, H, req.gasType)
+            return mE_pred - mE_exp
 
-        p0 = [rho_guess, 0.5, 0.5, 1.0]
+        # C. Fit Parameters using Least Squares
+        # Initial Guess (x0): [vP, rhoA, b, c]
+        # rhoA guess: 0.08 g/cm3 (typical for H2), 0.4 for CH4
+        rho_guess = 0.08 if req.gasType == "Hydrogen" else 0.4
+        x0 = [0.5, rho_guess, 1.0, 1.0]
         
-        # Bounds: rho_A(0-2), vp(0.1-5), b(>0), c(0.1-10)
-        bounds = ((0, 0.05, 0, 0.1), (2.0, 5.0, np.inf, 10))
+        # Bounds: vP(0-5), rhoA(0-2), b(>0), c(0-10)
+        lower_bounds = [1e-6, 1e-6, 1e-9, 1e-3]
+        upper_bounds = [10.0, 3.0, 1e6, 10.0]
+        
+        res = least_squares(residuals, x0, bounds=(lower_bounds, upper_bounds), method='trf')
+        vP_fit, rhoA_fit, b_fit, c_fit = res.x
 
-        def fit_wrapper(p_arr, r_a, v_p, bb, cc):
-            return excess_model_wrapper(p_arr, r_a, v_p, bb, cc, req.gasType, req.temperature, req.model)
-
-        # Perform Curve Fit
-        popt, pcov = curve_fit(fit_wrapper, pressures, excess_raw, p0=p0, bounds=bounds, maxfev=15000)
-        rho_A_fit, vp_fit, b_fit, c_fit = popt
-
-        # 3. Generate Isotherms
-        smooth_pressures = np.linspace(0, max(pressures) * 1.2, 60)
+        # D. Generate Curves for Plotting
+        smooth_P = np.linspace(0, max(P_exp) * 1.2, 60)
         chart_data = []
 
-        for p in smooth_pressures:
-            rho_B = calculate_bulk_density(p, req.temperature, req.gasType)
-            
-            # Calculate Theta
-            if req.model == 'langmuir':
-                theta = theta_langmuir(p, b_fit)
-            elif req.model == 'sips':
-                theta = theta_sips(p, b_fit, c_fit)
-            else: # toth
-                theta = theta_toth(p, b_fit, c_fit)
-            
-            # --- CALCULATE CURVES BASED ON PAPER ---
-            
-            # 1. Excess Adsorption (Fit) - Eq 12
-            # m_E = (rho_A - rho_B) * v_P * theta
-            exc_val = (rho_A_fit - rho_B) * vp_fit * theta * 100
-            
-            # 2. Absolute Adsorption (m_A) - Eq 5 & 11
-            # m_A = rho_A * v_A = rho_A * (v_P * theta)
-            # This represents ONLY the mass in the dense adsorbed layer.
-            abs_val = rho_A_fit * vp_fit * theta * 100
-            
-            # 3. Total Adsorption (m_P) - Eq 9
-            # m_P = m_E + (rho_B * v_P)
-            # This represents ALL gas in the pore (adsorbed layer + bulk gas center).
-            tot_val = exc_val + (rho_B * vp_fit * 100)
+        # Pre-calculate smooth Theta (H_A)
+        if req.model == 'langmuir':
+            smooth_H = H_langmuir(smooth_P, b_fit)
+        elif req.model == 'sips':
+            smooth_H = H_sips(smooth_P, b_fit, c_fit)
+        else: # toth
+            smooth_H = H_toth(smooth_P, b_fit, c_fit)
 
-            # Safety: Absolute should not be negative
-            if abs_val < 0: abs_val = 0
+        # Calculate all 3 curves using the fitted params
+        mE_smooth = m_excess_wt_percent(smooth_P, req.temperature, vP_fit, rhoA_fit, smooth_H, req.gasType)
+        mA_smooth = m_absolute_wt_percent(vP_fit, rhoA_fit, smooth_H)
+        mP_smooth = m_total_wt_percent(smooth_P, req.temperature, vP_fit, mE_smooth, req.gasType)
 
+        # E. Package Response
+        for i, p in enumerate(smooth_P):
             chart_data.append({
                 "pressure": round(p, 4),
-                "excessFit": round(exc_val, 4),
-                "absolute": round(abs_val, 4),
-                "total": round(tot_val, 4),
+                "excessFit": round(mE_smooth[i], 4),
+                "absolute": round(mA_smooth[i], 4),
+                "total": round(mP_smooth[i], 4),
                 "excessRaw": None
             })
 
         # Map Raw Data
-        for i, raw_p in enumerate(pressures):
-            idx = (np.abs(smooth_pressures - raw_p)).argmin()
-            chart_data[idx]["excessRaw"] = excess_raw[i]
+        for i, raw_p in enumerate(P_exp):
+            idx = (np.abs(smooth_P - raw_p)).argmin()
+            chart_data[idx]["excessRaw"] = mE_exp[i]
 
         return {
             "parameters": {
-                "vp": round(vp_fit, 4),
-                "rhoA": round(rho_A_fit, 4),
+                "vp": round(vP_fit, 4),
+                "rhoA": round(rhoA_fit, 4),
                 "b": round(b_fit, 4),
                 "c": round(c_fit, 4)
             },
@@ -176,6 +190,5 @@ async def calculate_isotherms(req: CalculateRequest):
         }
 
     except Exception as e:
-        # Fallback for fitting errors
-        print(f"Fitting error: {e}")
+        # Fallback for errors
         raise HTTPException(status_code=500, detail=str(e))
