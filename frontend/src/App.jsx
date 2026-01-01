@@ -21,11 +21,11 @@ const AdsorptionDashboard = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   
+  // Ref is now used specifically for the Chart container
   const chartRef = useRef(null);
 
   // --- Handlers ---
 
-  // 1. File Upload
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -41,11 +41,9 @@ const AdsorptionDashboard = () => {
     reader.readAsText(file);
   };
 
-  // 2. Calculate Request
   const handleCalculate = async () => {
     setIsProcessing(true);
     try {
-      // NOTE: Ensure this URL matches your deployed backend
       const response = await axios.post('https://adsorption-backend.onrender.com/calculate', {
         temperature: config.temperature,
         gasType: config.gasType,
@@ -59,7 +57,6 @@ const AdsorptionDashboard = () => {
     setIsProcessing(false);
   };
 
-  // 3. Download Template
   const handleDownloadTemplate = () => {
     const csvContent = "Pressure(MPa),ExcessUptake(wt%)\n0.1,0.5\n0.5,1.2\n1.0,2.5\n2.0,3.8\n5.0,4.5";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -69,18 +66,12 @@ const AdsorptionDashboard = () => {
     link.click();
   };
 
-  // 4. Download Results as CSV
   const handleDownloadResultsData = () => {
     if (!results) return;
-    
-    // Create CSV Header
     let csv = "Pressure(MPa),Excess_Raw,Excess_Fit,Absolute_Calc,Total_Capacity\n";
-    
-    // Add Rows
     results.chartData.forEach(row => {
       csv += `${row.pressure},${row.excessRaw || ''},${row.excessFit},${row.absolute},${row.total}\n`;
     });
-
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -88,10 +79,10 @@ const AdsorptionDashboard = () => {
     link.click();
   };
 
-  // 5. Download Chart as PNG
   const handleDownloadImage = async () => {
     if (chartRef.current) {
-      const canvas = await html2canvas(chartRef.current, { backgroundColor: '#ffffff' });
+      // Added padding to the screenshot so the labels aren't cut off
+      const canvas = await html2canvas(chartRef.current, { backgroundColor: '#ffffff', scale: 2 });
       const link = document.createElement('a');
       link.download = `isotherm_chart_${config.gasType}.png`;
       link.href = canvas.toDataURL();
@@ -177,7 +168,7 @@ const AdsorptionDashboard = () => {
                 <Download size={20} style={{ marginRight: '10px', verticalAlign: 'middle' }} /> Exports
               </h2>
               <button style={secondaryBtnStyle} onClick={handleDownloadImage}>
-                <ImageIcon size={16} /> Save PNG
+                <ImageIcon size={16} /> Save PNG (Chart Only)
               </button>
               <button style={secondaryBtnStyle} onClick={handleDownloadResultsData}>
                 <FileSpreadsheet size={16} /> Save CSV
@@ -190,8 +181,8 @@ const AdsorptionDashboard = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           {/* 1. CHART + DIAGRAM ROW */}
-          <div style={{ ...cardStyle, height: 'auto', padding: '20px' }} ref={chartRef}>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>Adsorption Isotherms</h2>
+          {/* We removed ref={chartRef} from here so it doesn't capture the whole white box */}
+          <div style={{ ...cardStyle, height: 'auto', padding: '20px' }}>
             
             {/* Split View: Chart vs Diagram */}
             <div style={{ 
@@ -201,51 +192,55 @@ const AdsorptionDashboard = () => {
               alignItems: 'start' 
             }}>
               
-              {/* Chart - FIXED HEIGHT (Square-ish) */}
-              <div style={{ height: '550px', width: '100%' }}>
-                {results ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={results.chartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="pressure" label={{ value: 'Pressure (MPa)', position: 'insideBottom', offset: -10 }} type="number" />
-                      <YAxis label={{ value: 'Uptake (wt%)', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip contentStyle={{ border: '1px solid #ccc' }} />
-                      
-                      <Legend 
-                        verticalAlign="top" 
-                        height={36}
-                        wrapperStyle={{ fontSize: '12px' }}
-                        payload={[
-                          { value: 'Experimental', type: 'circle', id: 'exp', color: '#000000', fill: '#000000' }, 
-                          { value: 'Excess (Fit)', type: 'plain', id: 'exc', color: '#dc2626' },
-                          { value: 'Absolute (Calc)', type: 'plain', id: 'abs', color: '#2563eb', payload: { strokeDasharray: '5 5' } },
-                          { value: 'Total Capacity', type: 'plain', id: 'tot', color: '#16a34a' }
-                        ]}
-                      />
+              {/* --- CAPTURE TARGET --- */}
+              {/* We put ref={chartRef} here. This means only this Title + Chart is downloaded. */}
+              <div style={{ width: '100%', padding: '10px', backgroundColor: 'white' }} ref={chartRef}>
+                <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>Adsorption Isotherms</h2>
+                <div style={{ height: '550px', width: '100%' }}>
+                  {results ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={results.chartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="pressure" label={{ value: 'Pressure (MPa)', position: 'insideBottom', offset: -10 }} type="number" />
+                        <YAxis label={{ value: 'Uptake (wt%)', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip contentStyle={{ border: '1px solid #ccc' }} />
+                        
+                        <Legend 
+                          verticalAlign="top" 
+                          height={36}
+                          wrapperStyle={{ fontSize: '12px' }}
+                          payload={[
+                            { value: 'Experimental', type: 'circle', id: 'exp', color: '#000000', fill: '#000000' }, 
+                            { value: 'Excess (Fit)', type: 'plain', id: 'exc', color: '#dc2626' },
+                            { value: 'Absolute (Calc)', type: 'plain', id: 'abs', color: '#2563eb', payload: { strokeDasharray: '5 5' } },
+                            { value: 'Total Capacity', type: 'plain', id: 'tot', color: '#16a34a' }
+                          ]}
+                        />
 
-                      <Line type="monotone" dataKey="absolute" stroke="#2563eb" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
-                      <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
-                      <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={2} name="Total Capacity" dot={false} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="excessRaw" 
-                        stroke="none" 
-                        name="Experimental Data" 
-                        dot={{ r: 4, fill: '#000000', stroke: 'none' }} 
-                        activeDot={{ r: 6 }}
-                        isAnimationActive={false}
-                      /> 
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-                    Upload data to visualize isotherms
-                  </div>
-                )}
+                        <Line type="monotone" dataKey="absolute" stroke="#2563eb" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
+                        <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
+                        <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={2} name="Total Capacity" dot={false} />
+                        <Line 
+                          type="monotone" 
+                          dataKey="excessRaw" 
+                          stroke="none" 
+                          name="Experimental Data" 
+                          dot={{ r: 4, fill: '#000000', stroke: 'none' }} 
+                          activeDot={{ r: 6 }}
+                          isAnimationActive={false}
+                        /> 
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                      Upload data to visualize isotherms
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Diagram - SAME FIXED HEIGHT (Scrollable) */}
-              <div style={{ width: '100%', height: '550px' }}>
+              {/* Diagram - OUTSIDE the Capture Ref */}
+              <div style={{ width: '100%', height: '580px' }}> {/* Adjusted height to match title+chart */}
                  <ConceptDiagram />
               </div>
             </div>
