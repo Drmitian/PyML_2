@@ -45,19 +45,21 @@ const AdsorptionDashboard = () => {
   };
 
   const handleCalculate = async () => {
+    // 🛑 Safety Check: Prevent crash if no data
+    if (inputData.length === 0) {
+      alert("Please upload a CSV file with data first.");
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      // ✅ Vercel Routing:
-      // Uses relative path. vercel.json rewrites this to /api/index.py automatically.
       const backendUrl = '/calculate'; 
 
       const response = await axios.post(backendUrl, {
         gasType: config.gasType,
         model: config.model,
-        // Pass Pore Volume Settings
         poreVolumeMode: config.poreVolumeMode,
         fixedPoreVolume: parseFloat(config.fixedPoreVolume),
-        // Wrap data for Global Solver structure
         datasets: [
             {
                 temperature: config.temperature,
@@ -129,6 +131,7 @@ const AdsorptionDashboard = () => {
   const containerStyle = { padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1600px', margin: '0 auto' };
   const cardStyle = { border: '1px solid #ddd', borderRadius: '8px', padding: '20px', marginBottom: '20px', backgroundColor: 'white' };
   const buttonStyle = { width: '100%', padding: '10px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
+  const disabledBtnStyle = { ...buttonStyle, backgroundColor: '#9ca3af', cursor: 'not-allowed' }; // Gray out button if no data
   const secondaryBtnStyle = { ...buttonStyle, backgroundColor: '#ffffff', color: '#333', border: '1px solid #ccc' };
   const inputStyle = { width: '100%', padding: '8px', marginBottom: '10px', border: '1px solid #ccc', borderRadius: '4px' };
   const labelStyle = { display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: '500' };
@@ -227,7 +230,11 @@ const AdsorptionDashboard = () => {
               )}
             </div>
 
-            <button style={buttonStyle} onClick={handleCalculate} disabled={isProcessing}>
+            <button 
+                style={inputData.length === 0 ? disabledBtnStyle : buttonStyle} 
+                onClick={handleCalculate} 
+                disabled={isProcessing || inputData.length === 0}
+            >
               {isProcessing ? 'Calculated...' : 'Generate Isotherms'}
             </button>
           </div>
