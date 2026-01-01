@@ -20,12 +20,9 @@ const AdsorptionDashboard = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
  
-  // Ref for the chart area (to capture it as an image)
   const chartRef = useRef(null);
 
   // --- Handlers ---
-
-  // 1. File Upload
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -41,13 +38,9 @@ const AdsorptionDashboard = () => {
     reader.readAsText(file);
   };
 
-  // 2. Calculate Request
   const handleCalculate = async () => {
     setIsProcessing(true);
     try {
-      // NOTE: Ensure this URL matches your deployed backend or localhost
-      // Use 'http://127.0.0.1:8000/calculate' for local testing
-      // Use 'https://adsorption-backend.onrender.com/calculate' for live
       const response = await axios.post('https://adsorption-backend.onrender.com/calculate', {
         temperature: config.temperature,
         gasType: config.gasType,
@@ -61,7 +54,6 @@ const AdsorptionDashboard = () => {
     setIsProcessing(false);
   };
 
-  // 3. Download Template
   const handleDownloadTemplate = () => {
     const csvContent = "Pressure(MPa),ExcessUptake(wt%)\n0.1,0.5\n0.5,1.2\n1.0,2.5\n2.0,3.8\n5.0,4.5";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -71,18 +63,12 @@ const AdsorptionDashboard = () => {
     link.click();
   };
 
-  // 4. Download Results as CSV
   const handleDownloadResultsData = () => {
     if (!results) return;
-   
-    // Create CSV Header
     let csv = "Pressure(MPa),Excess_Raw,Excess_Fit,Absolute_Calc,Total_Capacity\n";
-   
-    // Add Rows
     results.chartData.forEach(row => {
       csv += `${row.pressure},${row.excessRaw || ''},${row.excessFit},${row.absolute},${row.total}\n`;
     });
-
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -90,7 +76,6 @@ const AdsorptionDashboard = () => {
     link.click();
   };
 
-  // 5. Download Chart as PNG
   const handleDownloadImage = async () => {
     if (chartRef.current) {
       const canvas = await html2canvas(chartRef.current, { backgroundColor: '#ffffff' });
@@ -112,7 +97,6 @@ const AdsorptionDashboard = () => {
     <div style={containerStyle}>
       <IsothermInfoModal isOpen={showInfo} onClose={() => setShowInfo(false)} />
 
-      {/* Header */}
       <header style={{ borderBottom: '1px solid #eee', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Total Gas Adsorption Evaluator</h1>
         <button
@@ -124,10 +108,8 @@ const AdsorptionDashboard = () => {
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
-
-        {/* Left Column: Input & Controls */}
+        {/* Left Column */}
         <div>
-          {/* Data Input Section */}
           <div style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
@@ -140,7 +122,6 @@ const AdsorptionDashboard = () => {
                 Download Template
               </button>
             </div>
-           
             <div style={{ border: '2px dashed #ccc', padding: '20px', textAlign: 'center', cursor: 'pointer' }}>
               <input type="file" onChange={handleFileUpload} accept=".csv,.txt" />
               <p style={{ marginTop: '10px', color: '#666' }}>Upload CSV (Pressure, Uptake)</p>
@@ -148,35 +129,29 @@ const AdsorptionDashboard = () => {
             {inputData.length > 0 && <div style={{ marginTop: '10px', color: 'green', fontWeight: 'bold' }}>✓ Loaded {inputData.length} points</div>}
           </div>
 
-          {/* Parameters Section */}
           <div style={cardStyle}>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
               <Settings size={20} style={{ marginRight: '10px' }} /> Parameters
             </h2>
-           
             <label style={{ display: 'block', marginBottom: '5px' }}>Gas Type:</label>
             <select style={inputStyle} value={config.gasType} onChange={(e) => setConfig({ ...config, gasType: e.target.value })}>
               <option value="Hydrogen">Hydrogen (H₂)</option>
               <option value="Methane">Methane (CH₄)</option>
               <option value="CO2">Carbon Dioxide (CO₂)</option>
             </select>
-
             <label style={{ display: 'block', marginBottom: '5px' }}>Model:</label>
             <select style={inputStyle} value={config.model} onChange={(e) => setConfig({ ...config, model: e.target.value })}>
               <option value="toth">Toth</option>
               <option value="langmuir">Langmuir</option>
               <option value="sips">Sips</option>
             </select>
-
             <label style={{ display: 'block', marginBottom: '5px' }}>Temperature (K):</label>
             <input type="number" style={inputStyle} value={config.temperature} onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })} />
-
             <button style={buttonStyle} onClick={handleCalculate} disabled={isProcessing}>
               {isProcessing ? 'Calculated...' : 'Generate Isotherms'}
             </button>
           </div>
 
-          {/* Download Controls (Only show if results exist) */}
           {results && (
             <div style={cardStyle}>
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
@@ -192,9 +167,8 @@ const AdsorptionDashboard = () => {
           )}
         </div>
 
-        {/* Right Column: Chart & Results */}
+        {/* Right Column: Chart */}
         <div>
-          {/* Chart Container - We attach the Ref here to capture it */}
           <div style={{ ...cardStyle, height: '500px' }} ref={chartRef}>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>Adsorption Isotherms</h2>
             {results ? (
@@ -209,24 +183,24 @@ const AdsorptionDashboard = () => {
                     verticalAlign="top"
                     height={36}
                     payload={[
-                      { value: 'Absolute (Calc)', type: 'plain', id: 'abs', color: '#9333ea', payload: { strokeDasharray: '5 5' } },
-                      { value: 'Excess (Fit)', type: 'plain', id: 'exc', color: '#2563eb' },
-                      // FIX: Added 'fill' property to make the circle solid black
-                      { value: 'Experimental Data', type: 'circle', id: 'exp', color: '#000000', fill: '#000000' },
-                      { value: 'Total Capacity', type: 'plain', id: 'tot', color: '#059669' }
+                      // NEW COLOR SCHEME
+                      { value: 'Experimental Data', type: 'circle', id: 'exp', color: '#000000' }, 
+                      { value: 'Excess (Fit)', type: 'plain', id: 'exc', color: '#dc2626' },      // RED
+                      { value: 'Absolute (Calc)', type: 'plain', id: 'abs', color: '#2563eb', payload: { strokeDasharray: '5 5' } }, // BLUE
+                      { value: 'Total Capacity', type: 'plain', id: 'tot', color: '#16a34a' }      // GREEN
                     ]}
                   />
 
-                  {/* Absolute: Dashed Purple */}
-                  <Line type="monotone" dataKey="absolute" stroke="#9333ea" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
+                  {/* Absolute: Blue Dashed */}
+                  <Line type="monotone" dataKey="absolute" stroke="#2563eb" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
                  
-                  {/* Excess Fit: Solid Blue */}
-                  <Line type="monotone" dataKey="excessFit" stroke="#2563eb" strokeWidth={2} name="Excess (Fit)" dot={false} />
+                  {/* Excess Fit: Red Solid */}
+                  <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
                  
-                  {/* Total: Solid Green */}
-                  <Line type="monotone" dataKey="total" stroke="#059669" strokeWidth={2} name="Total Capacity" dot={false} />
+                  {/* Total: Green Solid */}
+                  <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={2} name="Total Capacity" dot={false} />
                  
-                  {/* Experimental: Black Dots */}
+                  {/* Experimental: Black Dots (No Line) */}
                   <Line
                     type="monotone"
                     dataKey="excessRaw"
