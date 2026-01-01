@@ -100,7 +100,7 @@ const AdsorptionDashboard = () => {
   };
 
   // --- Styles ---
-  const containerStyle = { padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1400px', margin: '0 auto' };
+  const containerStyle = { padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1600px', margin: '0 auto' };
   const cardStyle = { border: '1px solid #ddd', borderRadius: '8px', padding: '20px', marginBottom: '20px', backgroundColor: 'white' };
   const buttonStyle = { width: '100%', padding: '10px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
   const secondaryBtnStyle = { ...buttonStyle, backgroundColor: '#ffffff', color: '#333', border: '1px solid #ccc' };
@@ -121,9 +121,10 @@ const AdsorptionDashboard = () => {
         </button>
       </header>
 
+      {/* MAIN GRID: Left (Controls) vs Right (Results) */}
       <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '20px' }}>
         
-        {/* LEFT COLUMN: Controls */}
+        {/* --- LEFT COLUMN: Controls --- */}
         <div>
           {/* Data Input Section */}
           <div style={cardStyle}>
@@ -185,23 +186,23 @@ const AdsorptionDashboard = () => {
           )}
         </div>
 
-        {/* RIGHT COLUMN: Chart + Diagram */}
+        {/* --- RIGHT COLUMN: Results Wrapper --- */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* Chart Area Container */}
+          {/* 1. CHART + DIAGRAM ROW */}
           <div style={{ ...cardStyle, height: 'auto', padding: '20px' }} ref={chartRef}>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>Adsorption Isotherms</h2>
             
-            {/* CSS GRID LAYOUT: Forces side-by-side on desktop */}
+            {/* Split View: Chart vs Diagram */}
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: 'minmax(400px, 2fr) minmax(250px, 1fr)', 
+              gridTemplateColumns: 'minmax(450px, 3fr) minmax(250px, 1fr)', // Chart gets 3x space, Diagram gets 1x
               gap: '20px',
               alignItems: 'start' 
             }}>
               
-              {/* 1. The Graph (Takes 2/3 space) */}
-              <div style={{ height: '450px', width: '100%' }}>
+              {/* Chart */}
+              <div style={{ height: '500px', width: '100%' }}>
                 {results ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={results.chartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
@@ -222,16 +223,9 @@ const AdsorptionDashboard = () => {
                         ]}
                       />
 
-                      {/* Absolute: Blue Dashed */}
                       <Line type="monotone" dataKey="absolute" stroke="#2563eb" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
-                      
-                      {/* Excess Fit: Red Solid */}
                       <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
-                      
-                      {/* Total: Green Solid */}
                       <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={2} name="Total Capacity" dot={false} />
-                      
-                      {/* Experimental: Black Dots (No Line) */}
                       <Line 
                         type="monotone" 
                         dataKey="excessRaw" 
@@ -250,28 +244,39 @@ const AdsorptionDashboard = () => {
                 )}
               </div>
 
-              {/* 2. The Diagram (Takes 1/3 space) */}
+              {/* Diagram */}
               <div style={{ width: '100%' }}>
                  <ConceptDiagram />
               </div>
-
             </div>
           </div>
 
-          {/* Results Parameters */}
+          {/* 2. FITTED PARAMETERS ROW (Restored!) */}
           {results && (
             <div style={cardStyle}>
-              <h3 style={{ fontWeight: 'bold', marginBottom: '10px' }}>Fitted Parameters</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '20px' }}>
-                <div>Pore Volume (vP): <br/><b style={{fontSize:'18px'}}>{results.parameters.vp} cm³/g</b></div>
-                <div>Density (ρA): <br/><b style={{fontSize:'18px'}}>{results.parameters.rhoA} g/cm³</b></div>
-                <div>Affinity (b): <br/><b style={{fontSize:'18px'}}>{results.parameters.b}</b></div>
-                <div>Heterogeneity (c): <br/><b style={{fontSize:'18px'}}>{results.parameters.c}</b></div>
+              <h3 style={{ fontWeight: 'bold', marginBottom: '15px' }}>Fitted Parameters</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', textAlign: 'center' }}>
+                <div style={{ padding: '10px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#666' }}>Pore Volume (vP)</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2563eb' }}>{results.parameters.vp} <span style={{fontSize:'12px'}}>cm³/g</span></div>
+                </div>
+                <div style={{ padding: '10px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#666' }}>Density (ρA)</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2563eb' }}>{results.parameters.rhoA} <span style={{fontSize:'12px'}}>g/cm³</span></div>
+                </div>
+                <div style={{ padding: '10px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#666' }}>Affinity (b)</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2563eb' }}>{results.parameters.b}</div>
+                </div>
+                <div style={{ padding: '10px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#666' }}>Heterogeneity (c)</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2563eb' }}>{results.parameters.c}</div>
+                </div>
               </div>
             </div>
           )}
-        </div>
 
+        </div>
       </div>
     </div>
   );

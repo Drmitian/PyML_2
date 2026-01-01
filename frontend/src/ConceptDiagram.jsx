@@ -10,20 +10,23 @@ const ConceptDiagram = () => {
         
         {/* --- DEFINITIONS (Patterns & Gradients) --- */}
         <defs>
-          {/* Gradient for Cylinder Body (3D effect) */}
           <linearGradient id="cylinderBody" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#94a3b8" />
             <stop offset="50%" stopColor="#cbd5e1" />
             <stop offset="100%" stopColor="#94a3b8" />
           </linearGradient>
           
-          {/* Gradient for Adsorbed Layer (Dark Blue) */}
           <linearGradient id="adsLayer" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#1e3a8a" />
             <stop offset="20%" stopColor="#1e40af" />
             <stop offset="80%" stopColor="#1e40af" />
             <stop offset="100%" stopColor="#1e3a8a" />
           </linearGradient>
+          
+          {/* Arrow Marker Definition */}
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L0,6 L9,3 z" fill="#333" />
+          </marker>
         </defs>
 
         {/* --- TOP CYLINDER (Stage A: High P) --- */}
@@ -61,4 +64,21 @@ const ConceptDiagram = () => {
         <ellipse cx="250" cy="170" rx="10" ry="30" fill="#1e3a8a" stroke="#333" strokeWidth="2" />
 
         {/* Full Density Text */}
-        <text x="
+        <text x="150" y="175" fontSize="12" fill="#fff" fontWeight="bold" textAnchor="middle">ρB ≈ ρA</text>
+
+        {/* Right Label (Small Excess) */}
+        <path d="M 265 170 L 275 170" stroke="#333" markerEnd="url(#arrow)" />
+        <text x="280" y="165" fontSize="10" fontWeight="bold">Small Excess</text>
+        <text x="280" y="180" fontSize="9" fontStyle="italic">mE ≈ 0</text>
+
+        {/* Footer Text */}
+        <text x="150" y="225" fontSize="9" fill="#555" textAnchor="middle" fontStyle="italic">
+           High P increases bulk density (ρB), reducing excess.
+        </text>
+
+      </svg>
+    </div>
+  );
+};
+
+export default ConceptDiagram;
