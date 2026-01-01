@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
+import { Analytics } from '@vercel/analytics/react'; // <--- NEW ANALYTICS IMPORT
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
@@ -186,7 +187,7 @@ const AdsorptionDashboard = () => {
             <label style={labelStyle}>Temperature (K):</label>
             <input type="number" style={inputStyle} value={config.temperature} onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })} />
 
-            {/* NEW: Pore Volume Config */}
+            {/* Pore Volume Config */}
             <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f9fafb', borderRadius: '6px', border: '1px solid #eee' }}>
               <label style={labelStyle}>
                  <Beaker size={16} style={{display:'inline', marginRight:'5px', verticalAlign:'text-bottom'}}/> 
@@ -330,6 +331,9 @@ const AdsorptionDashboard = () => {
           </a>
         </p>
       </footer>
+      
+      {/* VERCEL ANALYTICS */}
+      <Analytics />
 
     </div>
   );
