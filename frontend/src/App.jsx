@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
-import { Analytics } from '@vercel/analytics/react'; // <--- NEW ANALYTICS IMPORT
+import { Analytics } from '@vercel/analytics/react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
@@ -322,13 +322,6 @@ const AdsorptionDashboard = () => {
       <footer style={{ marginTop: '40px', textAlign: 'center', color: '#666', fontSize: '14px', borderTop: '1px solid #eee', padding: '20px' }}>
         <p>
           <strong>Total Gas Adsorption Evaluator</strong> &copy; 2025 Created by <strong>Mi Tian</strong>
-        </p>
-        <p style={{ fontSize: '12px', marginTop: '5px' }}>
-          Based on the algorithm by Sharpe et al. (2013), implemented by Mi Tian.
-          <br />
-          <a href="https://github.com/Drmitian/PyML" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'none' }}>
-            View Source Code
-          </a>
         </p>
       </footer>
       
