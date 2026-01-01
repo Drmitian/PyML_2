@@ -2,69 +2,63 @@ import React from 'react';
 
 const ConceptDiagram = () => {
   return (
-    <div style={{ textAlign: 'center', padding: '10px' }}>
-      <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px', color: '#333' }}>
-        Adsorption Definitions
+    <div style={{ textAlign: 'center', padding: '10px', backgroundColor: '#fff', borderRadius: '8px' }}>
+      <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '15px', color: '#333' }}>
+        Physical Explanation (Pore View)
       </h3>
-      <svg viewBox="0 0 300 220" style={{ width: '100%', height: 'auto', maxWidth: '300px' }}>
-        {/* --- Background (The Pore Volume) --- */}
+      <svg viewBox="0 0 300 240" style={{ width: '100%', height: 'auto', maxWidth: '280px' }}>
+        
+        {/* --- DEFINITIONS (Patterns & Gradients) --- */}
         <defs>
-            {/* Pattern for Bulk Gas (Sparse Dots) */}
-            <pattern id="bulkGas" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-                <circle cx="10" cy="10" r="1.5" fill="#9ca3af" />
-            </pattern>
-            {/* Pattern for Adsorbed Layer (Dense Dots) */}
-            <pattern id="adsorbedLayer" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
-                <circle cx="5" cy="5" r="2.5" fill="#2563eb" />
-            </pattern>
+          {/* Gradient for Cylinder Body (3D effect) */}
+          <linearGradient id="cylinderBody" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#94a3b8" />
+            <stop offset="50%" stopColor="#cbd5e1" />
+            <stop offset="100%" stopColor="#94a3b8" />
+          </linearGradient>
+          
+          {/* Gradient for Adsorbed Layer (Dark Blue) */}
+          <linearGradient id="adsLayer" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#1e3a8a" />
+            <stop offset="20%" stopColor="#1e40af" />
+            <stop offset="80%" stopColor="#1e40af" />
+            <stop offset="100%" stopColor="#1e3a8a" />
+          </linearGradient>
         </defs>
 
-        {/* 1. The Container (Pore) */}
-        <rect x="50" y="20" width="200" height="180" fill="none" stroke="#333" strokeWidth="2" />
-        <text x="260" y="110" fontSize="12" fill="#666" style={{writingMode: 'vertical-rl'}}>Pore Volume</text>
-
-        {/* 2. Bulk Gas Area (Top - Sparse) */}
-        <rect x="50" y="20" width="200" height="180" fill="url(#bulkGas)" opacity="0.5" />
+        {/* --- TOP CYLINDER (Stage A: High P) --- */}
+        <text x="150" y="15" fontSize="12" fontWeight="bold" textAnchor="middle" fill="#333">Stage A: Near Peak (Adsorbed Layer)</text>
         
-        {/* 3. Adsorbed Layer (Bottom/Sides - Dense) */}
-        {/* We simulate a layer on the bottom surface */}
-        <rect x="50" y="140" width="200" height="60" fill="url(#adsorbedLayer)" />
-        <line x1="50" y1="140" x2="250" y2="140" stroke="#2563eb" strokeWidth="2" strokeDasharray="4 2" />
+        {/* Cylinder Body (Outer Shell) */}
+        <path d="M 50 40 L 250 40 L 250 100 L 50 100 Z" fill="#cbd5e1" stroke="#333" strokeWidth="2" />
+        <ellipse cx="50" cy="70" rx="10" ry="30" fill="#94a3b8" stroke="#333" strokeWidth="2" />
+        <ellipse cx="250" cy="70" rx="10" ry="30" fill="#cbd5e1" stroke="#333" strokeWidth="2" />
 
-        {/* --- Annotations (The Physics) --- */}
+        {/* Adsorbed Layer (Top & Bottom inside) */}
+        <rect x="50" y="42" width="200" height="15" fill="#1e3a8a" />
+        <rect x="50" y="83" width="200" height="15" fill="#1e3a8a" />
         
-        {/* Absolute Label */}
-        <line x1="10" y1="140" x2="45" y2="140" stroke="#2563eb" markerEnd="url(#arrow)" />
-        <line x1="10" y1="200" x2="45" y2="200" stroke="#2563eb" />
-        <line x1="10" y1="140" x2="10" y2="200" stroke="#2563eb" strokeWidth="2" />
-        <text x="15" y="175" fontSize="10" fill="#2563eb" fontWeight="bold" transform="rotate(-90 15,175)">Absolute</text>
-        <text x="35" y="175" fontSize="8" fill="#2563eb" transform="rotate(-90 35,175)">(Surface Only)</text>
-
-        {/* Excess Label */}
-        <text x="150" y="130" fontSize="11" fill="#dc2626" fontWeight="bold" textAnchor="middle">Excess Uptake</text>
-        <text x="150" y="142" fontSize="9" fill="#555" textAnchor="middle">(Measured)</text>
-        <path d="M 100 120 Q 150 150 200 120" stroke="#dc2626" fill="none" markerEnd="url(#arrow)" />
-
-        {/* Total Label */}
-        <rect x="60" y="30" width="80" height="20" fill="white" stroke="#16a34a" rx="4" />
-        <text x="100" y="44" fontSize="10" fill="#16a34a" fontWeight="bold" textAnchor="middle">Total Capacity</text>
-        <text x="170" y="44" fontSize="9" fill="#16a34a">= Adsorbed + Bulk</text>
-
-        {/* Legend for the Diagram */}
-        <circle cx="70" cy="210" r="3" fill="#2563eb" />
-        <text x="80" y="213" fontSize="9" fill="#333">Adsorbed Molecule</text>
+        {/* Bulk Gas (Middle - Light Blue) */}
+        <rect x="50" y="57" width="200" height="26" fill="#60a5fa" opacity="0.8" />
+        <text x="150" y="75" fontSize="11" fill="#fff" fontWeight="bold" textAnchor="middle">Dense Bulk Gas (ρB)</text>
         
-        <circle cx="180" cy="210" r="2" fill="#9ca3af" />
-        <text x="190" y="213" fontSize="9" fill="#333">Free Gas</text>
+        {/* Labels for Top Diagram */}
+        <text x="150" y="53" fontSize="10" fill="#fff" textAnchor="middle">ρA (Layer)</text>
+        <text x="150" y="95" fontSize="10" fill="#fff" textAnchor="middle">ρA (Layer)</text>
+        
+        {/* Right Label (Large Excess) */}
+        <path d="M 265 50 Q 280 70 265 90" fill="none" stroke="#333" markerEnd="url(#arrow)" />
+        <text x="270" y="60" fontSize="10" fontWeight="bold">Large Excess</text>
+        <text x="270" y="75" fontSize="9" fontStyle="italic">mE = mA - mB</text>
 
-      </svg>
-      <div style={{ fontSize: '11px', color: '#666', marginTop: '5px', textAlign: 'left', lineHeight: '1.4' }}>
-        <strong>Excess:</strong> What you measure (weight change).<br/>
-        <strong>Absolute:</strong> The actual dense layer on the surface.<br/>
-        <strong>Total:</strong> Everything inside the tank/pore.
-      </div>
-    </div>
-  );
-};
 
-export default ConceptDiagram;
+        {/* --- BOTTOM CYLINDER (Stage B: Very High P) --- */}
+        <text x="150" y="130" fontSize="12" fontWeight="bold" textAnchor="middle" fill="#333">Stage B: After Drop (Very High P)</text>
+
+        {/* Cylinder Body */}
+        <path d="M 50 140 L 250 140 L 250 200 L 50 200 Z" fill="#1e3a8a" stroke="#333" strokeWidth="2" />
+        <ellipse cx="50" cy="170" rx="10" ry="30" fill="#172554" stroke="#333" strokeWidth="2" />
+        <ellipse cx="250" cy="170" rx="10" ry="30" fill="#1e3a8a" stroke="#333" strokeWidth="2" />
+
+        {/* Full Density Text */}
+        <text x="

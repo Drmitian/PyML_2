@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { Upload, Settings, Info, Download, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
 import IsothermInfoModal from './IsothermInfo';
-import ConceptDiagram from './ConceptDiagram'; // <--- IMPORT THE NEW COMPONENT
+import ConceptDiagram from './ConceptDiagram';
 
 const AdsorptionDashboard = () => {
   // --- State Management ---
@@ -24,6 +24,8 @@ const AdsorptionDashboard = () => {
   const chartRef = useRef(null);
 
   // --- Handlers ---
+
+  // 1. File Upload
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -39,9 +41,11 @@ const AdsorptionDashboard = () => {
     reader.readAsText(file);
   };
 
+  // 2. Calculate Request
   const handleCalculate = async () => {
     setIsProcessing(true);
     try {
+      // NOTE: Ensure this URL matches your deployed backend
       const response = await axios.post('https://adsorption-backend.onrender.com/calculate', {
         temperature: config.temperature,
         gasType: config.gasType,
@@ -55,6 +59,7 @@ const AdsorptionDashboard = () => {
     setIsProcessing(false);
   };
 
+  // 3. Download Template
   const handleDownloadTemplate = () => {
     const csvContent = "Pressure(MPa),ExcessUptake(wt%)\n0.1,0.5\n0.5,1.2\n1.0,2.5\n2.0,3.8\n5.0,4.5";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -64,12 +69,18 @@ const AdsorptionDashboard = () => {
     link.click();
   };
 
+  // 4. Download Results as CSV
   const handleDownloadResultsData = () => {
     if (!results) return;
+    
+    // Create CSV Header
     let csv = "Pressure(MPa),Excess_Raw,Excess_Fit,Absolute_Calc,Total_Capacity\n";
+    
+    // Add Rows
     results.chartData.forEach(row => {
       csv += `${row.pressure},${row.excessRaw || ''},${row.excessFit},${row.absolute},${row.total}\n`;
     });
+
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -77,6 +88,7 @@ const AdsorptionDashboard = () => {
     link.click();
   };
 
+  // 5. Download Chart as PNG
   const handleDownloadImage = async () => {
     if (chartRef.current) {
       const canvas = await html2canvas(chartRef.current, { backgroundColor: '#ffffff' });
@@ -98,6 +110,7 @@ const AdsorptionDashboard = () => {
     <div style={containerStyle}>
       <IsothermInfoModal isOpen={showInfo} onClose={() => setShowInfo(false)} />
 
+      {/* Header */}
       <header style={{ borderBottom: '1px solid #eee', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Total Gas Adsorption Evaluator</h1>
         <button 
@@ -112,6 +125,7 @@ const AdsorptionDashboard = () => {
         
         {/* LEFT COLUMN: Controls */}
         <div>
+          {/* Data Input Section */}
           <div style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
@@ -131,6 +145,7 @@ const AdsorptionDashboard = () => {
             {inputData.length > 0 && <div style={{ marginTop: '10px', color: 'green', fontWeight: 'bold' }}>✓ Loaded {inputData.length} points</div>}
           </div>
 
+          {/* Parameters Section */}
           <div style={cardStyle}>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>
               <Settings size={20} style={{ marginRight: '10px', verticalAlign: 'middle' }} /> Parameters
@@ -154,6 +169,7 @@ const AdsorptionDashboard = () => {
             </button>
           </div>
 
+          {/* Download Controls */}
           {results && (
             <div style={cardStyle}>
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>
@@ -172,15 +188,20 @@ const AdsorptionDashboard = () => {
         {/* RIGHT COLUMN: Chart + Diagram */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* Chart Area */}
-          <div style={{ ...cardStyle, height: 'auto', minHeight: '500px' }} ref={chartRef}>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>Adsorption Isotherms</h2>
+          {/* Chart Area Container */}
+          <div style={{ ...cardStyle, height: 'auto', padding: '20px' }} ref={chartRef}>
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>Adsorption Isotherms</h2>
             
-            {/* Split View: Chart vs Diagram */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+            {/* CSS GRID LAYOUT: Forces side-by-side on desktop */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'minmax(400px, 2fr) minmax(250px, 1fr)', 
+              gap: '20px',
+              alignItems: 'start' 
+            }}>
               
-              {/* The Graph (Takes 70% width) */}
-              <div style={{ flex: '1 1 600px', height: '450px' }}>
+              {/* 1. The Graph (Takes 2/3 space) */}
+              <div style={{ height: '450px', width: '100%' }}>
                 {results ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={results.chartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
@@ -192,6 +213,7 @@ const AdsorptionDashboard = () => {
                       <Legend 
                         verticalAlign="top" 
                         height={36}
+                        wrapperStyle={{ fontSize: '12px' }}
                         payload={[
                           { value: 'Experimental', type: 'circle', id: 'exp', color: '#000000', fill: '#000000' }, 
                           { value: 'Excess (Fit)', type: 'plain', id: 'exc', color: '#dc2626' },
@@ -200,9 +222,16 @@ const AdsorptionDashboard = () => {
                         ]}
                       />
 
+                      {/* Absolute: Blue Dashed */}
                       <Line type="monotone" dataKey="absolute" stroke="#2563eb" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
+                      
+                      {/* Excess Fit: Red Solid */}
                       <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
+                      
+                      {/* Total: Green Solid */}
                       <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={2} name="Total Capacity" dot={false} />
+                      
+                      {/* Experimental: Black Dots (No Line) */}
                       <Line 
                         type="monotone" 
                         dataKey="excessRaw" 
@@ -221,8 +250,8 @@ const AdsorptionDashboard = () => {
                 )}
               </div>
 
-              {/* The Diagram (Takes 30% width) */}
-              <div style={{ flex: '1 1 250px', borderLeft: '1px solid #eee', paddingLeft: '10px' }}>
+              {/* 2. The Diagram (Takes 1/3 space) */}
+              <div style={{ width: '100%' }}>
                  <ConceptDiagram />
               </div>
 
