@@ -9,13 +9,14 @@ import IsothermInfoModal from './IsothermInfo';
 import ConceptDiagram from './ConceptDiagram';
 
 const AdsorptionDashboard = () => {
+  // --- State Management ---
   const [inputData, setInputData] = useState([]);
   const [config, setConfig] = useState({
     gasType: 'Hydrogen',
     temperature: 77,
     model: 'toth',
-    // NEW: Pore Volume Config
-    poreVolumeMode: 'fitted', // 'fitted' or 'fixed'
+    // Pore Volume Defaults
+    poreVolumeMode: 'fitted', // Options: 'fitted' or 'fixed'
     fixedPoreVolume: 0.5
   });
   
@@ -24,6 +25,8 @@ const AdsorptionDashboard = () => {
   const [showInfo, setShowInfo] = useState(false);
   
   const chartRef = useRef(null);
+
+  // --- Handlers ---
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -43,15 +46,17 @@ const AdsorptionDashboard = () => {
   const handleCalculate = async () => {
     setIsProcessing(true);
     try {
-      // ⚠️ UPDATE YOUR BACKEND URL HERE
-      const backendUrl = 'https://py-ml-2.vercel.app/calculate'; 
+      // ✅ Vercel Routing:
+      // Uses relative path. vercel.json rewrites this to /api/index.py automatically.
+      const backendUrl = '/calculate'; 
 
       const response = await axios.post(backendUrl, {
         gasType: config.gasType,
         model: config.model,
-        // Send Pore Volume Config
+        // Pass Pore Volume Settings
         poreVolumeMode: config.poreVolumeMode,
         fixedPoreVolume: parseFloat(config.fixedPoreVolume),
+        // Wrap data for Global Solver structure
         datasets: [
             {
                 temperature: config.temperature,
@@ -75,8 +80,14 @@ const AdsorptionDashboard = () => {
       });
 
     } catch (error) {
-      alert("Error: Calculation failed.");
-      console.error(error);
+      console.error("Full Error Details:", error);
+      if (error.response) {
+        alert(`Server Error (${error.response.status}):\n${JSON.stringify(error.response.data)}`);
+      } else if (error.request) {
+        alert("Network Error: No response received. Check if Backend is running.");
+      } else {
+        alert(`Error: ${error.message}`);
+      }
     }
     setIsProcessing(false);
   };
@@ -113,6 +124,7 @@ const AdsorptionDashboard = () => {
     }
   };
 
+  // --- Styles ---
   const containerStyle = { padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1600px', margin: '0 auto' };
   const cardStyle = { border: '1px solid #ddd', borderRadius: '8px', padding: '20px', marginBottom: '20px', backgroundColor: 'white' };
   const buttonStyle = { width: '100%', padding: '10px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
@@ -124,6 +136,7 @@ const AdsorptionDashboard = () => {
     <div style={containerStyle}>
       <IsothermInfoModal isOpen={showInfo} onClose={() => setShowInfo(false)} />
 
+      {/* HEADER */}
       <header style={{ borderBottom: '1px solid #eee', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Total Gas Adsorption Evaluator</h1>
         <button onClick={() => setShowInfo(true)} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: '1px solid #ccc', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>
@@ -132,7 +145,10 @@ const AdsorptionDashboard = () => {
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '20px' }}>
+        
+        {/* LEFT COLUMN: Controls */}
         <div>
+          {/* 1. Upload Section */}
           <div style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
@@ -147,6 +163,7 @@ const AdsorptionDashboard = () => {
             {inputData.length > 0 && <div style={{ marginTop: '10px', color: 'green', fontWeight: 'bold' }}>✓ Loaded {inputData.length} points</div>}
           </div>
 
+          {/* 2. Parameters Section */}
           <div style={cardStyle}>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>
               <Settings size={20} style={{ marginRight: '10px', verticalAlign: 'middle' }} /> Parameters
@@ -169,7 +186,7 @@ const AdsorptionDashboard = () => {
             <label style={labelStyle}>Temperature (K):</label>
             <input type="number" style={inputStyle} value={config.temperature} onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })} />
 
-            {/* --- NEW: Pore Volume Section --- */}
+            {/* NEW: Pore Volume Config */}
             <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f9fafb', borderRadius: '6px', border: '1px solid #eee' }}>
               <label style={labelStyle}>
                  <Beaker size={16} style={{display:'inline', marginRight:'5px', verticalAlign:'text-bottom'}}/> 
@@ -208,13 +225,13 @@ const AdsorptionDashboard = () => {
                 </div>
               )}
             </div>
-            {/* -------------------------------- */}
 
             <button style={buttonStyle} onClick={handleCalculate} disabled={isProcessing}>
               {isProcessing ? 'Calculated...' : 'Generate Isotherms'}
             </button>
           </div>
 
+          {/* 3. Export Section */}
           {results && (
             <div style={cardStyle}>
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>
@@ -230,10 +247,14 @@ const AdsorptionDashboard = () => {
           )}
         </div>
 
+        {/* RIGHT COLUMN: Visualization */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* Chart & Diagram */}
           <div style={{ ...cardStyle, height: 'auto', padding: '20px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(450px, 3fr) minmax(250px, 1fr)', gap: '20px', alignItems: 'start' }}>
               
+              {/* Main Chart */}
               <div style={{ width: '100%', padding: '10px', backgroundColor: 'white' }} ref={chartRef}>
                 <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>Adsorption Isotherms</h2>
                 <div style={{ height: '550px', width: '100%' }}>
@@ -246,6 +267,7 @@ const AdsorptionDashboard = () => {
                         <Tooltip contentStyle={{ border: '1px solid #ccc' }} />
                         <Legend verticalAlign="top" height={36} />
 
+                        {/* Lines Layered for Visibility */}
                         <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={4} name="Total Capacity" dot={false} />
                         <Line type="monotone" dataKey="absolute" stroke="#9333ea" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
                         <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
@@ -260,12 +282,14 @@ const AdsorptionDashboard = () => {
                 </div>
               </div>
 
+              {/* Sidebar Diagram */}
               <div style={{ width: '100%', height: '580px' }}>
                  <ConceptDiagram />
               </div>
             </div>
           </div>
 
+          {/* Results Table */}
           {results && (
             <div style={cardStyle}>
               <h3 style={{ fontWeight: 'bold', marginBottom: '15px' }}>Fitted Parameters</h3>
@@ -292,6 +316,21 @@ const AdsorptionDashboard = () => {
 
         </div>
       </div>
+
+      {/* FOOTER - OWNERSHIP & CREDITS */}
+      <footer style={{ marginTop: '40px', textAlign: 'center', color: '#666', fontSize: '14px', borderTop: '1px solid #eee', padding: '20px' }}>
+        <p>
+          <strong>Total Gas Adsorption Evaluator</strong> &copy; 2025 Created by <strong>Your Name / Lab Name</strong>
+        </p>
+        <p style={{ fontSize: '12px', marginTop: '5px' }}>
+          Based on the algorithm by Sharpe et al. (2013), implemented by Your Name.
+          <br />
+          <a href="https://github.com/Drmitian/PyML" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'none' }}>
+            View Source Code
+          </a>
+        </p>
+      </footer>
+
     </div>
   );
 };
