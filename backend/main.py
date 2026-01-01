@@ -21,108 +21,60 @@ app.add_middleware(
 # ---------------------------------------------------------
 # 1. LOAD "MINI-REFPROP" TABLES
 # ---------------------------------------------------------
-# Global interpolators dictionary
 interpolators = {}
 
 def load_lookup_tables():
-    """
-    Loads the gas_lookup.csv file generated locally.
-    Creates high-speed interpolators for density (T, P) -> rho.
-    """
     csv_path = "gas_lookup.csv"
-    
-    # Check if file exists
     if not os.path.exists(csv_path):
-        print(f"⚠️ Warning: '{csv_path}' not found. Backend will use approximate EOS fallback.")
+        print(f"⚠️ Warning: '{csv_path}' not found. Using approximate EOS.")
         return
 
     try:
         df = pd.read_csv(csv_path)
-        
         for gas in df['Gas'].unique():
             sub = df[df['Gas'] == gas]
-            
-            # Pivot to create grid for RegularGridInterpolator
-            # Rows = Temperature, Cols = Pressure, Values = Density
             pivot = sub.pivot(index='T_K', columns='P_MPa', values='Density_g_cm3')
-            
-            T_grid = pivot.index.values.astype(float)
-            P_grid = pivot.columns.values.astype(float)
-            rho_grid = pivot.values.astype(float)
-            
             interpolators[gas] = RegularGridInterpolator(
-                (T_grid, P_grid), rho_grid, bounds_error=False, fill_value=None
+                (pivot.index.values.astype(float), pivot.columns.values.astype(float)), 
+                pivot.values.astype(float), bounds_error=False, fill_value=None
             )
-        print("✅ Loaded high-precision EOS tables from CSV.")
-        
+        print("✅ Loaded high-precision EOS tables.")
     except Exception as e:
         print(f"❌ Error loading lookup tables: {e}")
 
-# Load tables on server startup
 load_lookup_tables()
 
 # ---------------------------------------------------------
-# 2. PHYSICS ENGINE & DENSITY CALCULATOR
+# 2. PHYSICS ENGINE
 # ---------------------------------------------------------
-GAS_PROPS = {
-    "Hydrogen": {"M_kg": 2.016e-3},
-    "Methane":  {"M_kg": 16.04e-3},
-    "CO2":      {"M_kg": 44.01e-3}
-}
+GAS_PROPS = { "Hydrogen": {"M_kg": 2.016e-3}, "Methane": {"M_kg": 16.04e-3}, "CO2": {"M_kg": 44.01e-3} }
 R_GAS = 8.314
 
 def get_density(P_MPa, T_K, gas_type):
-    """
-    Returns Gas Density (rho) in g/cm³.
-    Priority 1: Lookup Table (NIST Accuracy).
-    Priority 2: Approximate EOS Fallback.
-    """
-    # 1. Try Lookup Table
     if gas_type in interpolators:
         if np.isscalar(P_MPa):
-            # Interpolator requires [[T, P]]
             val = interpolators[gas_type]([[T_K, P_MPa]])[0]
             if not np.isnan(val): return float(val)
         else:
-            # Vectorized lookup
             pts = np.column_stack((np.full_like(P_MPa, T_K), P_MPa))
             vals = interpolators[gas_type](pts)
-            # If any NaNs (out of bounds), fill them using fallback? 
-            # For simplicity, if we have NaNs, we let fallback handle those specific points usually, 
-            # but here we return table result if valid.
             if not np.any(np.isnan(vals)): return vals
 
-    # 2. Fallback: Approximate EOS (Redlich-Kwong / Ideal-ish)
+    # Fallback EOS
     P_bar = P_MPa * 10
-    M_kg = GAS_PROPS.get(gas_type, {}).get("M_kg", 2.016e-3)
-    
-    # Simple Compressibility Factors (Z)
-    if gas_type == "Hydrogen":
-        Z = 1.0 + (0.0006 * P_bar)
-    elif gas_type == "CO2":
-        Z = np.maximum(0.3, 1.0 - (0.005 * P_bar) + (0.00002 * P_bar**2))
-    else: # Methane
-        Z = np.maximum(0.6, 1.0 - (0.002 * P_bar))
+    M_kg = GAS_PROPS.get(gas_type, {}).get("M_kg", 2e-3)
+    if gas_type == "Hydrogen": Z = 1.0 + (0.0006 * P_bar)
+    elif gas_type == "CO2": Z = np.maximum(0.3, 1.0 - (0.005 * P_bar) + (0.00002 * P_bar**2))
+    else: Z = np.maximum(0.6, 1.0 - (0.002 * P_bar))
+    return ((P_MPa * 1e6 * M_kg) / (Z * R_GAS * T_K)) / 1000.0
 
-    P_Pa = P_MPa * 1e6
-    rho_kg_m3 = (P_Pa * M_kg) / (Z * R_GAS * T_K)
-    return rho_kg_m3 / 1000.0 # Convert to g/cm3
-
-# --- Isotherm Theta Models (0 to 1) ---
-def H_langmuir(P, b):
-    x = b * P
-    return x / (1.0 + x)
-
-def H_toth(P, b, c):
-    x = b * P
-    return x / (1.0 + np.power(x, c)) ** (1.0 / c)
-
-def H_sips(P, b, n):
-    x = np.power(b * P, 1.0/n)
-    return x / (1.0 + x)
+# --- Isotherm Models ---
+def H_langmuir(P, b): return (b * P) / (1.0 + b * P)
+def H_toth(P, b, c): x = b * P; return x / (1.0 + np.power(x, c)) ** (1.0 / c)
+def H_sips(P, b, n): x = np.power(b * P, 1.0/n); return x / (1.0 + x)
 
 # ---------------------------------------------------------
-# 3. GLOBAL SOLVER (Sharpe-Style)
+# 3. UPDATED GLOBAL SOLVER (Supports Fixed vP)
 # ---------------------------------------------------------
 class DataPoint(BaseModel):
     pressure: float
@@ -136,158 +88,131 @@ class GlobalFitRequest(BaseModel):
     gasType: str
     model: str
     datasets: List[IsothermDataset]
+    # NEW PARAMETERS
+    poreVolumeMode: str = "fitted" # 'fitted' or 'fixed'
+    fixedPoreVolume: float = 0.0
 
 @app.post("/calculate")
 async def calculate_global(req: GlobalFitRequest):
     try:
-        # --- A. Data Prep: Flatten all datasets ---
-        all_P = []
-        all_mE = []
-        all_T = []
-        dataset_indices = [] # Stores (start_index, end_index) for each dataset
-        
+        # --- A. Data Prep ---
+        all_P, all_mE, all_T, dataset_indices = [], [], [], []
         cursor = 0
         for ds in req.datasets:
-            p_arr = np.array([d.pressure for d in ds.data], dtype=float)
-            m_arr = np.array([d.excessUptake for d in ds.data], dtype=float)
-            count = len(p_arr)
-            
-            all_P.append(p_arr)
-            all_mE.append(m_arr)
-            all_T.append(np.full(count, ds.temperature))
-            
-            dataset_indices.append((cursor, cursor + count))
-            cursor += count
+            p = np.array([d.pressure for d in ds.data], dtype=float)
+            all_P.append(p)
+            all_mE.append(np.array([d.excessUptake for d in ds.data], dtype=float))
+            all_T.append(np.full(len(p), ds.temperature))
+            dataset_indices.append((cursor, cursor + len(p)))
+            cursor += len(p)
 
         P_flat = np.concatenate(all_P)
         mE_flat = np.concatenate(all_mE)
         T_flat = np.concatenate(all_T)
         num_datasets = len(req.datasets)
+        
+        is_fixed_vp = (req.poreVolumeMode == "fixed")
 
-        # --- B. Define Residuals for Global Fit ---
-        # Param Vector x structure:
-        # x[0] = vP (Shared Pore Volume)
-        # x[1] = rhoA (Shared Adsorbate Density)
-        # x[2] = c (Shared Heterogeneity - typical for Sharpe model)
-        # x[3:] = b_1, b_2, ... b_N (Affinity for each temperature)
+        # --- B. Define Residuals ---
+        # If Fixed vP: x = [rhoA, c, b1...bN] (vP is constant)
+        # If Fitted vP: x = [vP, rhoA, c, b1...bN]
         
         def residuals(x):
-            vP, rhoA, c = x[0], x[1], x[2]
-            b_params = x[3:]
+            # 1. Unpack Parameters based on mode
+            if is_fixed_vp:
+                vP = req.fixedPoreVolume
+                rhoA, c = x[0], x[1]
+                b_params = x[2:]
+            else:
+                vP = x[0]
+                rhoA, c = x[1], x[2]
+                b_params = x[3:]
             
             resids = []
-            
-            # Loop through each dataset/temperature
             for i, (start, end) in enumerate(dataset_indices):
-                P_local = P_flat[start:end]
-                mE_local = mE_flat[start:end]
-                T_local = T_flat[start:end][0]
-                b_local = b_params[i]
+                P_loc = P_flat[start:end]
+                rhoB = get_density(P_loc, T_flat[start:end][0], req.gasType)
                 
-                # 1. Get Density (Lookup or EOS)
-                rhoB = get_density(P_local, T_local, req.gasType)
+                # Theta Calculation
+                if req.model == 'langmuir': theta = H_langmuir(P_loc, b_params[i])
+                elif req.model == 'sips': theta = H_sips(P_loc, b_params[i], c)
+                else: theta = H_toth(P_loc, b_params[i], c)
                 
-                # 2. Calculate Theta
-                if req.model == 'langmuir':
-                    theta = H_langmuir(P_local, b_local)
-                elif req.model == 'sips':
-                    theta = H_sips(P_local, b_local, c)
-                else: # toth
-                    theta = H_toth(P_local, b_local, c)
-                
-                # 3. Model Prediction (Sharpe Eq 12)
-                # mE = (rhoA - rhoB) * vP * theta * 100
+                # Sharpe Eq 12: mE = (rhoA - rhoB) * vP * theta * 100
                 mE_pred = (rhoA - rhoB) * 100.0 * vP * theta
-                
-                resids.append(mE_pred - mE_local)
+                resids.append(mE_pred - mE_flat[start:end])
                 
             return np.concatenate(resids)
 
         # --- C. Run Optimization ---
-        # Initial Guesses: vP=0.5, rhoA=0.08(H2)/0.4(CH4), c=0.5
         rho_guess = 0.08 if req.gasType == "Hydrogen" else 0.4
-        x0 = [0.5, rho_guess, 0.5] + [1.0] * num_datasets
         
-        # Bounds: 
-        # vP(0.01-5), rhoA(0.01-3), c(0.1-10), b(1e-5 - inf)
-        lower_bounds = [0.01, 0.01, 0.1] + [1e-5] * num_datasets
-        upper_bounds = [5.00, 3.00, 10.0] + [np.inf] * num_datasets
+        if is_fixed_vp:
+            # x0 = [rhoA, c, b...]
+            x0 = [rho_guess, 0.5] + [1.0] * num_datasets
+            lower = [0.01, 0.1] + [1e-5] * num_datasets
+            upper = [3.00, 10.0] + [np.inf] * num_datasets
+        else:
+            # x0 = [vP, rhoA, c, b...]
+            x0 = [0.5, rho_guess, 0.5] + [1.0] * num_datasets
+            lower = [0.01, 0.01, 0.1] + [1e-5] * num_datasets
+            upper = [5.00, 3.00, 10.0] + [np.inf] * num_datasets
         
-        opt = least_squares(residuals, x0, bounds=(lower_bounds, upper_bounds), method='trf')
+        opt = least_squares(residuals, x0, bounds=(lower, upper), method='trf')
         
-        vP_fit, rhoA_fit, c_fit = opt.x[0], opt.x[1], opt.x[2]
-        b_fits = opt.x[3:]
+        # Unpack Results
+        if is_fixed_vp:
+            vP_fit = req.fixedPoreVolume
+            rhoA_fit, c_fit = opt.x[0], opt.x[1]
+            b_fits = opt.x[2:]
+        else:
+            vP_fit = opt.x[0]
+            rhoA_fit, c_fit = opt.x[1], opt.x[2]
+            b_fits = opt.x[3:]
 
-        # --- D. Generate Response Curves ---
+        # --- D. Generate Response ---
         results = []
         warnings = []
-        max_rhoB_seen = 0
+        max_rhoB = 0
         
         for i, ds in enumerate(req.datasets):
-            T_local = ds.temperature
-            b_local = b_fits[i]
-            
-            # Smooth Curve Generation
+            # Smooth Curves
             raw_P = np.array([d.pressure for d in ds.data])
             smooth_P = np.linspace(0, max(raw_P) * 1.2, 60)
+            rhoB = get_density(smooth_P, ds.temperature, req.gasType)
+            max_rhoB = max(max_rhoB, np.max(rhoB))
             
-            rhoB_smooth = get_density(smooth_P, T_local, req.gasType)
-            max_rhoB_seen = max(max_rhoB_seen, np.max(rhoB_smooth))
+            if req.model == 'langmuir': theta = H_langmuir(smooth_P, b_fits[i])
+            elif req.model == 'sips': theta = H_sips(smooth_P, b_fits[i], c_fit)
+            else: theta = H_toth(smooth_P, b_fits[i], c_fit)
             
-            if req.model == 'langmuir':
-                theta = H_langmuir(smooth_P, b_local)
-            elif req.model == 'sips':
-                theta = H_sips(smooth_P, b_local, c_fit)
-            else:
-                theta = H_toth(smooth_P, b_local, c_fit)
+            mE = (rhoA_fit - rhoB) * 100.0 * vP_fit * theta
+            mA = rhoA_fit * 100.0 * vP_fit * theta
+            mP = mE + (rhoB * 100.0 * vP_fit)
             
-            # Calculate Physical Quantities
-            # 1. Excess (Fit)
-            mE_smooth = (rhoA_fit - rhoB_smooth) * 100.0 * vP_fit * theta
-            # 2. Absolute (Adsorbed Phase Only)
-            mA_smooth = rhoA_fit * 100.0 * vP_fit * theta
-            # 3. Total (Entire Pore)
-            mP_smooth = mE_smooth + (rhoB_smooth * 100.0 * vP_fit)
-            
-            # Format Data
             chart_data = []
             for j, p in enumerate(smooth_P):
-                # Safety: Clamp negative absolute at 0 (only happens if physics breaks)
-                abs_val = max(0, mA_smooth[j])
-                
                 chart_data.append({
                     "pressure": round(p, 4),
-                    "excessFit": round(mE_smooth[j], 4),
-                    "absolute": round(abs_val, 4),
-                    "total": round(mP_smooth[j], 4),
+                    "excessFit": round(mE[j], 4),
+                    "absolute": round(max(0, mA[j]), 4),
+                    "total": round(mP[j], 4),
                     "excessRaw": None
                 })
-                
+            
             # Map Raw Data
             raw_mE = np.array([d.excessUptake for d in ds.data])
-            for k, raw_p in enumerate(raw_P):
-                idx = (np.abs(smooth_P - raw_p)).argmin()
+            for k, rp in enumerate(raw_P):
+                idx = (np.abs(smooth_P - rp)).argmin()
                 chart_data[idx]["excessRaw"] = raw_mE[k]
 
-            results.append({
-                "temperature": T_local,
-                "b": round(b_local, 4),
-                "chartData": chart_data
-            })
+            results.append({ "temperature": ds.temperature, "b": round(b_fits[i], 4), "chartData": chart_data })
 
-        # --- E. Sanity Checks ---
-        if rhoA_fit < max_rhoB_seen:
-            warnings.append(f"⚠️ Physics Warning: Fitted Adsorbate Density ({rhoA_fit:.3f} g/cm³) is lower than Bulk Gas Density ({max_rhoB_seen:.3f} g/cm³). This suggests the model is struggling to distinguish adsorbed phase from bulk gas.")
-            
-        if vP_fit > 2.0:
-            warnings.append(f"⚠️ Data Warning: Fitted Pore Volume ({vP_fit:.2f} cm³/g) is physically unlikely (usually < 1.5). Check units.")
+        if rhoA_fit < max_rhoB: warnings.append(f"⚠️ Physics Warning: Fitted Adsorbate Density ({rhoA_fit:.3f}) < Bulk Density.")
+        if vP_fit > 5.0: warnings.append("⚠️ Data Warning: Pore Volume is extremely high.")
 
         return {
-            "globalParameters": {
-                "vp": round(vP_fit, 4),
-                "rhoA": round(rhoA_fit, 4),
-                "c": round(c_fit, 4)
-            },
+            "globalParameters": { "vp": round(vP_fit, 4), "rhoA": round(rhoA_fit, 4), "c": round(c_fit, 4) },
             "datasets": results,
             "warnings": warnings
         }
@@ -295,9 +220,8 @@ async def calculate_global(req: GlobalFitRequest):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Calculation Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-# Vercel entry point
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

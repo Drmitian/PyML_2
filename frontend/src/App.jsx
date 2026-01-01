@@ -4,26 +4,26 @@ import html2canvas from 'html2canvas';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { Upload, Settings, Info, Download, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
+import { Upload, Settings, Info, Download, Image as ImageIcon, FileSpreadsheet, Beaker } from 'lucide-react';
 import IsothermInfoModal from './IsothermInfo';
 import ConceptDiagram from './ConceptDiagram';
 
 const AdsorptionDashboard = () => {
-  // --- State Management ---
   const [inputData, setInputData] = useState([]);
   const [config, setConfig] = useState({
     gasType: 'Hydrogen',
     temperature: 77,
     model: 'toth',
-    eosModel: 'nist_leachman'
+    // NEW: Pore Volume Config
+    poreVolumeMode: 'fitted', // 'fitted' or 'fixed'
+    fixedPoreVolume: 0.5
   });
+  
   const [results, setResults] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   
   const chartRef = useRef(null);
-
-  // --- Handlers ---
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -40,19 +40,18 @@ const AdsorptionDashboard = () => {
     reader.readAsText(file);
   };
 
-  // --- UPDATED CALCULATION HANDLER (Global Solver Support) ---
   const handleCalculate = async () => {
     setIsProcessing(true);
     try {
-      // ⚠️ IMPORTANT: Replace this URL with your actual Backend URL
-      // If using Vercel: 'https://adsorption-backend-YOURPROJECT.vercel.app/calculate'
-      // If using Render: 'https://adsorption-backend.onrender.com/calculate'
-      const backendUrl = 'https://adsorption-backend.onrender.com/calculate'; 
+      // ⚠️ UPDATE YOUR BACKEND URL HERE
+      const backendUrl = 'https://py-ml-2.vercel.app/calculate'; 
 
       const response = await axios.post(backendUrl, {
         gasType: config.gasType,
         model: config.model,
-        // Wrap the single dataset in a list to satisfy the Global Solver
+        // Send Pore Volume Config
+        poreVolumeMode: config.poreVolumeMode,
+        fixedPoreVolume: parseFloat(config.fixedPoreVolume),
         datasets: [
             {
                 temperature: config.temperature,
@@ -61,13 +60,10 @@ const AdsorptionDashboard = () => {
         ]
       });
       
-      // Handle the new response structure
-      // The backend returns a list of results, we just take the first one (since we only sent one)
       const firstSet = response.data.datasets[0];
       const globalParams = response.data.globalParameters;
       const warnings = response.data.warnings || [];
 
-      // Display physics warnings if any (e.g., rhoA < rhoB)
       if(warnings.length > 0) alert(warnings.join('\n'));
 
       setResults({
@@ -79,7 +75,7 @@ const AdsorptionDashboard = () => {
       });
 
     } catch (error) {
-      alert("Error: Calculation failed. Check if backend is running and URL is correct.");
+      alert("Error: Calculation failed.");
       console.error(error);
     }
     setIsProcessing(false);
@@ -122,6 +118,7 @@ const AdsorptionDashboard = () => {
   const buttonStyle = { width: '100%', padding: '10px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
   const secondaryBtnStyle = { ...buttonStyle, backgroundColor: '#ffffff', color: '#333', border: '1px solid #ccc' };
   const inputStyle = { width: '100%', padding: '8px', marginBottom: '10px', border: '1px solid #ccc', borderRadius: '4px' };
+  const labelStyle = { display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: '500' };
 
   return (
     <div style={containerStyle}>
@@ -154,20 +151,65 @@ const AdsorptionDashboard = () => {
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>
               <Settings size={20} style={{ marginRight: '10px', verticalAlign: 'middle' }} /> Parameters
             </h2>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Gas Type:</label>
+            
+            <label style={labelStyle}>Gas Type:</label>
             <select style={inputStyle} value={config.gasType} onChange={(e) => setConfig({ ...config, gasType: e.target.value })}>
               <option value="Hydrogen">Hydrogen (H₂)</option>
               <option value="Methane">Methane (CH₄)</option>
               <option value="CO2">Carbon Dioxide (CO₂)</option>
             </select>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Model:</label>
+            
+            <label style={labelStyle}>Model:</label>
             <select style={inputStyle} value={config.model} onChange={(e) => setConfig({ ...config, model: e.target.value })}>
               <option value="toth">Toth</option>
               <option value="langmuir">Langmuir</option>
               <option value="sips">Sips</option>
             </select>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Temperature (K):</label>
+            
+            <label style={labelStyle}>Temperature (K):</label>
             <input type="number" style={inputStyle} value={config.temperature} onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })} />
+
+            {/* --- NEW: Pore Volume Section --- */}
+            <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f9fafb', borderRadius: '6px', border: '1px solid #eee' }}>
+              <label style={labelStyle}>
+                 <Beaker size={16} style={{display:'inline', marginRight:'5px', verticalAlign:'text-bottom'}}/> 
+                 Pore Volume (vP):
+              </label>
+              
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                <label style={{ fontSize: '13px', cursor: 'pointer' }}>
+                  <input 
+                    type="radio" 
+                    name="vpMode" 
+                    checked={config.poreVolumeMode === 'fitted'} 
+                    onChange={() => setConfig({...config, poreVolumeMode: 'fitted'})}
+                  /> Auto-Fit
+                </label>
+                <label style={{ fontSize: '13px', cursor: 'pointer' }}>
+                  <input 
+                    type="radio" 
+                    name="vpMode" 
+                    checked={config.poreVolumeMode === 'fixed'} 
+                    onChange={() => setConfig({...config, poreVolumeMode: 'fixed'})}
+                  /> Fixed
+                </label>
+              </div>
+
+              {config.poreVolumeMode === 'fixed' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    style={{ ...inputStyle, marginBottom: 0 }} 
+                    value={config.fixedPoreVolume} 
+                    onChange={(e) => setConfig({...config, fixedPoreVolume: e.target.value})}
+                  />
+                  <span style={{ fontSize: '13px', color: '#666', fontWeight: 'bold' }}>cm³/g</span>
+                </div>
+              )}
+            </div>
+            {/* -------------------------------- */}
+
             <button style={buttonStyle} onClick={handleCalculate} disabled={isProcessing}>
               {isProcessing ? 'Calculated...' : 'Generate Isotherms'}
             </button>
@@ -202,29 +244,11 @@ const AdsorptionDashboard = () => {
                         <XAxis dataKey="pressure" label={{ value: 'Pressure (MPa)', position: 'insideBottom', offset: -10 }} type="number" />
                         <YAxis label={{ value: 'Uptake (wt%)', angle: -90, position: 'insideLeft' }} />
                         <Tooltip contentStyle={{ border: '1px solid #ccc' }} />
-                        
-                        <Legend 
-                          verticalAlign="top" 
-                          height={36}
-                          wrapperStyle={{ fontSize: '12px' }}
-                          payload={[
-                            { value: 'Experimental Data', type: 'circle', id: 'exp', color: '#000000', fill: '#000000' }, 
-                            { value: 'Excess (Fit)', type: 'plain', id: 'exc', color: '#dc2626' }, 
-                            { value: 'Absolute (Calc)', type: 'plain', id: 'abs', color: '#9333ea', payload: { strokeDasharray: '5 5' } }, 
-                            { value: 'Total Capacity', type: 'plain', id: 'tot', color: '#16a34a' } 
-                          ]}
-                        />
+                        <Legend verticalAlign="top" height={36} />
 
-                        {/* 1. Total (Green Solid) - Bottom Layer */}
                         <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={4} name="Total Capacity" dot={false} />
-                        
-                        {/* 2. Absolute (Purple Dashed) - Middle Layer */}
                         <Line type="monotone" dataKey="absolute" stroke="#9333ea" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
-                        
-                        {/* 3. Excess (Red Solid) - Top Layer */}
                         <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
-                        
-                        {/* 4. Experimental (Dots) - Topmost */}
                         <Line type="monotone" dataKey="excessRaw" stroke="none" name="Experimental Data" dot={{ r: 4, fill: '#000000', stroke: 'none' }} activeDot={{ r: 6 }} isAnimationActive={false} /> 
                       </LineChart>
                     </ResponsiveContainer>
