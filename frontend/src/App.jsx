@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import axios from 'axios';
+import html2canvas from 'html2canvas';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
-import { Upload, FileText, Settings, Activity, Info } from 'lucide-react';
+import { Upload, Settings, Info, Download, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
 import IsothermInfoModal from './IsothermInfo';
 
 const AdsorptionDashboard = () => {
@@ -18,8 +19,13 @@ const AdsorptionDashboard = () => {
   const [results, setResults] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  
+  // Ref for the chart area (to capture it as an image)
+  const chartRef = useRef(null);
 
   // --- Handlers ---
+
+  // 1. File Upload
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -35,9 +41,13 @@ const AdsorptionDashboard = () => {
     reader.readAsText(file);
   };
 
+  // 2. Calculate Request
   const handleCalculate = async () => {
     setIsProcessing(true);
     try {
+      // NOTE: Ensure this URL matches your deployed backend or localhost
+      // Use 'http://127.0.0.1:8000/calculate' for local testing
+      // Use 'https://adsorption-backend.onrender.com/calculate' for live
       const response = await axios.post('https://adsorption-backend.onrender.com/calculate', {
         temperature: config.temperature, 
         gasType: config.gasType, 
@@ -51,15 +61,55 @@ const AdsorptionDashboard = () => {
     setIsProcessing(false);
   };
 
+  // 3. Download Template
+  const handleDownloadTemplate = () => {
+    const csvContent = "Pressure(MPa),ExcessUptake(wt%)\n0.1,0.5\n0.5,1.2\n1.0,2.5\n2.0,3.8\n5.0,4.5";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "template_adsorption_data.csv";
+    link.click();
+  };
+
+  // 4. Download Results as CSV
+  const handleDownloadResultsData = () => {
+    if (!results) return;
+    
+    // Create CSV Header
+    let csv = "Pressure(MPa),Excess_Raw,Excess_Fit,Absolute_Calc,Total_Capacity\n";
+    
+    // Add Rows
+    results.chartData.forEach(row => {
+      csv += `${row.pressure},${row.excessRaw || ''},${row.excessFit},${row.absolute},${row.total}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `results_${config.gasType}_${config.model}.csv`;
+    link.click();
+  };
+
+  // 5. Download Chart as PNG
+  const handleDownloadImage = async () => {
+    if (chartRef.current) {
+      const canvas = await html2canvas(chartRef.current, { backgroundColor: '#ffffff' });
+      const link = document.createElement('a');
+      link.download = `isotherm_chart_${config.gasType}.png`;
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+  };
+
   // --- Styles ---
   const containerStyle = { padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1200px', margin: '0 auto' };
   const cardStyle = { border: '1px solid #ddd', borderRadius: '8px', padding: '20px', marginBottom: '20px', backgroundColor: 'white' };
-  const buttonStyle = { width: '100%', padding: '10px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', marginTop: '10px' };
+  const buttonStyle = { width: '100%', padding: '10px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
+  const secondaryBtnStyle = { ...buttonStyle, backgroundColor: '#ffffff', color: '#333', border: '1px solid #ccc' };
   const inputStyle = { width: '100%', padding: '8px', marginBottom: '10px', border: '1px solid #ccc', borderRadius: '4px' };
 
   return (
     <div style={containerStyle}>
-      {/* Help Modal */}
       <IsothermInfoModal isOpen={showInfo} onClose={() => setShowInfo(false)} />
 
       {/* Header */}
@@ -77,17 +127,28 @@ const AdsorptionDashboard = () => {
 
         {/* Left Column: Input & Controls */}
         <div>
+          {/* Data Input Section */}
           <div style={cardStyle}>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
-              <Upload size={20} style={{ marginRight: '10px' }} /> Data Input
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                <Upload size={20} style={{ marginRight: '10px' }} /> Data Input
+              </h2>
+              <button 
+                onClick={handleDownloadTemplate} 
+                style={{ fontSize: '12px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Download Template
+              </button>
+            </div>
+            
             <div style={{ border: '2px dashed #ccc', padding: '20px', textAlign: 'center', cursor: 'pointer' }}>
               <input type="file" onChange={handleFileUpload} accept=".csv,.txt" />
               <p style={{ marginTop: '10px', color: '#666' }}>Upload CSV (Pressure, Uptake)</p>
             </div>
-            {inputData.length > 0 && <div style={{ marginTop: '10px', color: 'green' }}>Loaded {inputData.length} points</div>}
+            {inputData.length > 0 && <div style={{ marginTop: '10px', color: 'green', fontWeight: 'bold' }}>✓ Loaded {inputData.length} points</div>}
           </div>
 
+          {/* Parameters Section */}
           <div style={cardStyle}>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
               <Settings size={20} style={{ marginRight: '10px' }} /> Parameters
@@ -114,11 +175,27 @@ const AdsorptionDashboard = () => {
               {isProcessing ? 'Calculated...' : 'Generate Isotherms'}
             </button>
           </div>
+
+          {/* Download Controls (Only show if results exist) */}
+          {results && (
+            <div style={cardStyle}>
+              <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
+                <Download size={20} style={{ marginRight: '10px' }} /> Exports
+              </h2>
+              <button style={secondaryBtnStyle} onClick={handleDownloadImage}>
+                <ImageIcon size={16} /> Save Chart as PNG
+              </button>
+              <button style={secondaryBtnStyle} onClick={handleDownloadResultsData}>
+                <FileSpreadsheet size={16} /> Save Data as CSV
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Chart & Results */}
         <div>
-          <div style={{ ...cardStyle, height: '500px' }}>
+          {/* Chart Container - We attach the Ref here to capture it */}
+          <div style={{ ...cardStyle, height: '500px' }} ref={chartRef}>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>Adsorption Isotherms</h2>
             {results ? (
               <ResponsiveContainer width="100%" height="90%">
