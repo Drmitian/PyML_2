@@ -266,9 +266,20 @@ const AdsorptionDashboard = () => {
                         <XAxis dataKey="pressure" label={{ value: 'Pressure (MPa)', position: 'insideBottom', offset: -10 }} type="number" />
                         <YAxis label={{ value: 'Uptake (wt%)', angle: -90, position: 'insideLeft' }} />
                         <Tooltip contentStyle={{ border: '1px solid #ccc' }} />
-                        <Legend verticalAlign="top" height={36} />
+                        
+                        {/* 🟢 CUSTOM LEGEND ORDER 🟢 */}
+                        <Legend 
+                          verticalAlign="top" 
+                          height={36} 
+                          payload={[
+                            { value: 'Experimental Data', type: 'circle', color: '#000000', id: 'exp' },
+                            { value: 'Excess (Fit)', type: 'line', color: '#dc2626', id: 'excess' },
+                            { value: 'Absolute (Calc)', type: 'line', color: '#9333ea', id: 'abs' },
+                            { value: 'Total Capacity', type: 'line', color: '#16a34a', id: 'total' }
+                          ]}
+                        />
 
-                        {/* Lines Layered for Visibility */}
+                        {/* Lines Layered for Visibility (Drawing Order: Bottom -> Top) */}
                         <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={4} name="Total Capacity" dot={false} />
                         <Line type="monotone" dataKey="absolute" stroke="#9333ea" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
                         <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
