@@ -9,19 +9,95 @@ import { Upload, Settings, Info, Download, Image as ImageIcon, FileSpreadsheet, 
 import IsothermInfoModal from './IsothermInfo';
 import ConceptDiagram from './ConceptDiagram';
 
+// --- DEMO DATA (Pre-loaded from te7_test.csv) ---
+const DEMO_INPUT_DATA = [
+  { pressure: 0.1, excessUptake: 0.85 }, { pressure: 0.5, excessUptake: 1.62 },
+  { pressure: 1.0, excessUptake: 1.95 }, { pressure: 2.0, excessUptake: 2.18 },
+  { pressure: 3.0, excessUptake: 2.25 }, { pressure: 4.0, excessUptake: 2.28 },
+  { pressure: 5.0, excessUptake: 2.25 }, { pressure: 6.0, excessUptake: 2.2 },
+  { pressure: 8.0, excessUptake: 2.1 }, { pressure: 10.0, excessUptake: 1.98 },
+  { pressure: 12.0, excessUptake: 1.85 }, { pressure: 14.0, excessUptake: 1.72 }
+];
+
+const DEMO_RESULTS = {
+  parameters: { vp: 0.3449, rhoA: 0.0976, c: 0.5369, b: 8.409 },
+  chartData: [
+    { pressure: 0.0, excessFit: 0.0, absolute: 0, total: 0.0, excessRaw: 0.85 },
+    { pressure: 0.2847, excessFit: 1.3495, absolute: 1.362, total: 1.3804, excessRaw: null },
+    { pressure: 0.5695, excessFit: 1.6951, absolute: 1.7267, total: 1.7567, excessRaw: 1.62 },
+    { pressure: 0.8542, excessFit: 1.8806, absolute: 1.9336, total: 1.9729, excessRaw: null },
+    { pressure: 1.139, excessFit: 1.9981, absolute: 2.0737, total: 2.1209, excessRaw: 1.95 },
+    { pressure: 1.4237, excessFit: 2.0783, absolute: 2.1775, total: 2.2317, excessRaw: null },
+    { pressure: 1.7085, excessFit: 2.1355, absolute: 2.2587, total: 2.3191, excessRaw: null },
+    { pressure: 1.9932, excessFit: 2.1769, absolute: 2.3246, total: 2.3908, excessRaw: 2.18 },
+    { pressure: 2.278, excessFit: 2.2071, absolute: 2.3796, total: 2.4512, excessRaw: null },
+    { pressure: 2.5627, excessFit: 2.229, absolute: 2.4265, total: 2.5031, excessRaw: null },
+    { pressure: 2.8475, excessFit: 2.2443, absolute: 2.4671, total: 2.5484, excessRaw: null },
+    { pressure: 3.1322, excessFit: 2.2546, absolute: 2.5028, total: 2.5885, excessRaw: 2.25 },
+    { pressure: 3.4169, excessFit: 2.2607, absolute: 2.5344, total: 2.6244, excessRaw: null },
+    { pressure: 3.7017, excessFit: 2.2634, absolute: 2.5627, total: 2.6567, excessRaw: null },
+    { pressure: 3.9864, excessFit: 2.2633, absolute: 2.5883, total: 2.6861, excessRaw: 2.28 },
+    { pressure: 4.2712, excessFit: 2.2608, absolute: 2.6116, total: 2.7131, excessRaw: null },
+    { pressure: 4.5559, excessFit: 2.2563, absolute: 2.6328, total: 2.7379, excessRaw: null },
+    { pressure: 4.8407, excessFit: 2.25, absolute: 2.6524, total: 2.7609, excessRaw: null },
+    { pressure: 5.1254, excessFit: 2.2421, absolute: 2.6704, total: 2.7822, excessRaw: 2.25 },
+    { pressure: 5.4102, excessFit: 2.233, absolute: 2.6872, total: 2.8021, excessRaw: null },
+    { pressure: 5.6949, excessFit: 2.2227, absolute: 2.7028, total: 2.8208, excessRaw: null },
+    { pressure: 5.9797, excessFit: 2.2114, absolute: 2.7173, total: 2.8383, excessRaw: 2.2 },
+    { pressure: 6.2644, excessFit: 2.1991, absolute: 2.7309, total: 2.8549, excessRaw: null },
+    { pressure: 6.5492, excessFit: 2.1861, absolute: 2.7437, total: 2.8705, excessRaw: null },
+    { pressure: 6.8339, excessFit: 2.1723, absolute: 2.7558, total: 2.8853, excessRaw: null },
+    { pressure: 7.1186, excessFit: 2.1579, absolute: 2.7672, total: 2.8993, excessRaw: null },
+    { pressure: 7.4034, excessFit: 2.1428, absolute: 2.778, total: 2.9127, excessRaw: null },
+    { pressure: 7.6881, excessFit: 2.1273, absolute: 2.7882, total: 2.9255, excessRaw: null },
+    { pressure: 7.9729, excessFit: 2.1112, absolute: 2.7979, total: 2.9376, excessRaw: 2.1 },
+    { pressure: 8.2576, excessFit: 2.0948, absolute: 2.8071, total: 2.9493, excessRaw: null },
+    { pressure: 8.5424, excessFit: 2.0779, absolute: 2.8159, total: 2.9604, excessRaw: null },
+    { pressure: 8.8271, excessFit: 2.0607, absolute: 2.8243, total: 2.9711, excessRaw: null },
+    { pressure: 9.1119, excessFit: 2.0431, absolute: 2.8323, total: 2.9814, excessRaw: null },
+    { pressure: 9.3966, excessFit: 2.0252, absolute: 2.84, total: 2.9913, excessRaw: null },
+    { pressure: 9.6814, excessFit: 2.0071, absolute: 2.8474, total: 3.0008, excessRaw: null },
+    { pressure: 9.9661, excessFit: 1.9887, absolute: 2.8545, total: 3.01, excessRaw: 1.98 },
+    { pressure: 10.2508, excessFit: 1.9701, absolute: 2.8612, total: 3.0189, excessRaw: null },
+    { pressure: 10.5356, excessFit: 1.9512, absolute: 2.8678, total: 3.0274, excessRaw: null },
+    { pressure: 10.8203, excessFit: 1.9322, absolute: 2.8741, total: 3.0357, excessRaw: null },
+    { pressure: 11.1051, excessFit: 1.913, absolute: 2.8801, total: 3.0437, excessRaw: null },
+    { pressure: 11.3898, excessFit: 1.8936, absolute: 2.8859, total: 3.0515, excessRaw: null },
+    { pressure: 11.6746, excessFit: 1.8741, absolute: 2.8916, total: 3.059, excessRaw: null },
+    { pressure: 11.9593, excessFit: 1.8544, absolute: 2.897, total: 3.0663, excessRaw: 1.85 },
+    { pressure: 12.2441, excessFit: 1.8346, absolute: 2.9023, total: 3.0734, excessRaw: null },
+    { pressure: 12.5288, excessFit: 1.8147, absolute: 2.9074, total: 3.0803, excessRaw: null },
+    { pressure: 12.8136, excessFit: 1.7946, absolute: 2.9123, total: 3.0869, excessRaw: null },
+    { pressure: 13.0983, excessFit: 1.7745, absolute: 2.9171, total: 3.0935, excessRaw: null },
+    { pressure: 13.3831, excessFit: 1.7543, absolute: 2.9217, total: 3.0998, excessRaw: null },
+    { pressure: 13.6678, excessFit: 1.734, absolute: 2.9262, total: 3.1059, excessRaw: null },
+    { pressure: 13.9525, excessFit: 1.7136, absolute: 2.9306, total: 3.112, excessRaw: 1.72 },
+    { pressure: 14.2373, excessFit: 1.6932, absolute: 2.9348, total: 3.1178, excessRaw: null },
+    { pressure: 14.522, excessFit: 1.6727, absolute: 2.9389, total: 3.1235, excessRaw: null },
+    { pressure: 14.8068, excessFit: 1.6522, absolute: 2.9429, total: 3.1291, excessRaw: null },
+    { pressure: 15.0915, excessFit: 1.6316, absolute: 2.9468, total: 3.1345, excessRaw: null },
+    { pressure: 15.3763, excessFit: 1.6109, absolute: 2.9506, total: 3.1398, excessRaw: null },
+    { pressure: 15.661, excessFit: 1.5902, absolute: 2.9543, total: 3.145, excessRaw: null },
+    { pressure: 15.9458, excessFit: 1.5695, absolute: 2.9579, total: 3.1501, excessRaw: null },
+    { pressure: 16.2305, excessFit: 1.5487, absolute: 2.9614, total: 3.1551, excessRaw: null },
+    { pressure: 16.5153, excessFit: 1.5279, absolute: 2.9648, total: 3.1599, excessRaw: null },
+    { pressure: 16.8, excessFit: 1.5071, absolute: 2.9682, total: 3.1647, excessRaw: null }
+  ]
+};
+
 const AdsorptionDashboard = () => {
-  // --- State Management ---
-  const [inputData, setInputData] = useState([]);
+  // --- State Management (Initialized with Demo Data) ---
+  const [inputData, setInputData] = useState(DEMO_INPUT_DATA); // <--- Demo Data
+  const [results, setResults] = useState(DEMO_RESULTS);        // <--- Demo Results
+  
   const [config, setConfig] = useState({
     gasType: 'Hydrogen',
     temperature: 77,
     model: 'toth',
-    // Pore Volume Defaults
-    poreVolumeMode: 'fitted', // Options: 'fitted' or 'fixed'
+    poreVolumeMode: 'fitted', 
     fixedPoreVolume: 0.5
   });
   
-  const [results, setResults] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   
@@ -40,12 +116,12 @@ const AdsorptionDashboard = () => {
         return { pressure: parseFloat(p), excessUptake: parseFloat(u) };
       }).filter(d => !isNaN(d.pressure) && !isNaN(d.excessUptake));
       setInputData(parsedData);
+      setResults(null); // Clear old demo results when new file is uploaded
     };
     reader.readAsText(file);
   };
 
   const handleCalculate = async () => {
-    // 🛑 Safety Check: Prevent crash if no data
     if (inputData.length === 0) {
       alert("Please upload a CSV file with data first.");
       return;
@@ -131,7 +207,7 @@ const AdsorptionDashboard = () => {
   const containerStyle = { padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1600px', margin: '0 auto' };
   const cardStyle = { border: '1px solid #ddd', borderRadius: '8px', padding: '20px', marginBottom: '20px', backgroundColor: 'white' };
   const buttonStyle = { width: '100%', padding: '10px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
-  const disabledBtnStyle = { ...buttonStyle, backgroundColor: '#9ca3af', cursor: 'not-allowed' }; // Gray out button if no data
+  const disabledBtnStyle = { ...buttonStyle, backgroundColor: '#9ca3af', cursor: 'not-allowed' };
   const secondaryBtnStyle = { ...buttonStyle, backgroundColor: '#ffffff', color: '#333', border: '1px solid #ccc' };
   const inputStyle = { width: '100%', padding: '8px', marginBottom: '10px', border: '1px solid #ccc', borderRadius: '4px' };
   const labelStyle = { display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: '500' };
@@ -274,7 +350,6 @@ const AdsorptionDashboard = () => {
                         <YAxis label={{ value: 'Uptake (wt%)', angle: -90, position: 'insideLeft' }} />
                         <Tooltip contentStyle={{ border: '1px solid #ccc' }} />
                         
-                        {/* 🟢 CUSTOM LEGEND ORDER 🟢 */}
                         <Legend 
                           verticalAlign="top" 
                           height={36} 
@@ -286,7 +361,6 @@ const AdsorptionDashboard = () => {
                           ]}
                         />
 
-                        {/* Lines Layered for Visibility (Drawing Order: Bottom -> Top) */}
                         <Line type="monotone" dataKey="total" stroke="#16a34a" strokeWidth={4} name="Total Capacity" dot={false} />
                         <Line type="monotone" dataKey="absolute" stroke="#9333ea" strokeWidth={2} name="Absolute (Calc)" dot={false} strokeDasharray="5 5" />
                         <Line type="monotone" dataKey="excessFit" stroke="#dc2626" strokeWidth={2} name="Excess (Fit)" dot={false} />
